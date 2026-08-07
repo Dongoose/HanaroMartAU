@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="app-version" content="2026-08-07T09:20:00Z">
+<meta name="app-version" content="2026-08-07T10:05:00Z">
 <title>시제금 계산 - 하나로마트</title>
 <style>
   :root {
@@ -22,6 +22,9 @@
     --danger-bg: #fbeae8;
     --danger-text: #b23a2e;
     --danger-border: #efb3ac;
+    --warning-bg: #fcf1da;
+    --warning-text: #92600a;
+    --warning-border: #e9c77b;
     --radius: 10px;
     --font-ui: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: "SF Mono", "Menlo", "Consolas", "Roboto Mono", monospace;
@@ -43,6 +46,9 @@
       --danger-bg: #341815;
       --danger-text: #ff8a7a;
       --danger-border: #6b2a22;
+      --warning-bg: #3a2b0e;
+      --warning-text: #f2c265;
+      --warning-border: #6b4e1d;
     }
   }
   :root[data-theme="dark"] {
@@ -61,6 +67,9 @@
     --danger-bg: #341815;
     --danger-text: #ff8a7a;
     --danger-border: #6b2a22;
+    --warning-bg: #3a2b0e;
+    --warning-text: #f2c265;
+    --warning-border: #6b4e1d;
   }
   :root[data-theme="light"] {
     --bg: #f2f5f4;
@@ -78,6 +87,9 @@
     --danger-bg: #fbeae8;
     --danger-text: #b23a2e;
     --danger-border: #efb3ac;
+    --warning-bg: #fcf1da;
+    --warning-text: #92600a;
+    --warning-border: #e9c77b;
   }
 
   * { box-sizing: border-box; }
@@ -453,10 +465,15 @@
     color: var(--success-text);
     border-color: var(--success-border);
   }
-  .status-pill.mismatch {
+  .status-pill.short {
     background: var(--danger-bg);
     color: var(--danger-text);
     border-color: var(--danger-border);
+  }
+  .status-pill.over {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-border);
   }
 
   /* ---- settings ---- */
@@ -504,6 +521,7 @@
     font-variant-numeric: tabular-nums;
     font-size: 14px;
     min-width: 0;
+    text-align: right;
   }
   .pos-row__remove {
     background: none;
@@ -700,6 +718,12 @@
 
   updateDateBar();
   setInterval(updateDateBar, 30000);
+
+  document.addEventListener("focus", function (e) {
+    if (e.target.tagName === "INPUT" && e.target.type === "number") {
+      e.target.select();
+    }
+  }, true);
 
   var DENOMS = [
     { id: "d100",label: "$100",cents: 10000, group: "note" },
@@ -952,7 +976,7 @@
         '<div class="adj-row">' +
           '<span class="adj-row__label">' + label + (hint ? "<small>" + hint + "</small>" : "") + "</span>" +
           '<span class="adj-row__input-wrap"><span>$</span>' +
-            '<input type="number" inputmode="decimal" min="0" step="0.01" class="adj-input" data-key="' + key + '" placeholder="0.00" value="' + dollars + '">' +
+            '<input type="number" inputmode="decimal" min="0" step="1" class="adj-input" data-key="' + key + '" placeholder="0" value="' + dollars + '">' +
           "</span>" +
         "</div>"
       );
@@ -978,10 +1002,10 @@
     root.innerHTML =
       '<p class="section-label">오늘의 조정 (' + todayKey() + ')</p>' +
       '<div class="adj-list">' +
-        adjRowHtml("drop", "드랍금", "금고에 넣어둔 금액") +
+        adjRowHtml("drop", "드랍금", null) +
         adjRowHtml("expense", "일반지출", "현금으로 낸 비용") +
         adjRowHtml("cashPaid", "Cash Paid", "물건값 현금 지불") +
-        '<div class="adj-summary"><span>차감 합계</span><strong id="adjSumDisplay"></strong></div>' +
+        '<div class="adj-summary"><span>조정 합계</span><strong id="adjSumDisplay"></strong></div>' +
       "</div>" +
       '<p class="section-label">지폐</p>' +
       '<div class="denom-list">' + rowsHtml("note") + "</div>" +
@@ -1042,8 +1066,8 @@
       var total = 0;
       DENOMS.forEach(function (d) { total += (counts[d.id] || 0) * d.cents; });
 
-      var deducted = adj.drop + adj.expense + adj.cashPaid;
-      document.getElementById("adjSumDisplay").textContent = "−" + formatMoney(deducted).slice(1);
+      var netAdj = adj.drop - adj.expense - adj.cashPaid;
+      document.getElementById("adjSumDisplay").textContent = (netAdj >= 0 ? "+" : "−") + formatMoney(Math.abs(netAdj)).slice(1);
 
       var target = getTarget();
       document.getElementById("totalDisplay").textContent = "합계 " + formatMoney(total);
@@ -1064,15 +1088,18 @@
       pill.style.color = "";
       pill.style.borderColor = "";
 
-      var expected = target - deducted;
+      var expected = target + netAdj;
       targetDisplay.textContent = formatMoney(expected);
       var diff = total - expected;
       if (diff === 0) {
         pill.className = "status-pill match";
         pill.textContent = "✓ 일치";
+      } else if (diff < 0) {
+        pill.className = "status-pill short";
+        pill.textContent = "−" + formatMoney(Math.abs(diff)).slice(1);
       } else {
-        pill.className = "status-pill mismatch";
-        pill.textContent = (diff > 0 ? "+" : "−") + formatMoney(Math.abs(diff)).slice(1);
+        pill.className = "status-pill over";
+        pill.textContent = "+" + formatMoney(Math.abs(diff)).slice(1);
       }
     }
 
