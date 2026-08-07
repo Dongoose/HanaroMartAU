@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="app-version" content="2026-08-07T06:55:00Z">
+<meta name="app-version" content="2026-08-07T09:20:00Z">
 <title>시제금 계산 - 하나로마트</title>
 <style>
   :root {
@@ -559,6 +559,77 @@
   }
   .save-toast.show { opacity: 1; }
 
+  .datebar {
+    padding: 5px 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .adj-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .adj-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .adj-row + .adj-row { border-top: 1px solid var(--border); }
+  .adj-row__label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .adj-row__label small {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 1px;
+  }
+  .adj-row__input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .adj-row__input-wrap span { color: var(--text-muted); font-size: 14px; }
+  .adj-row__input-wrap input {
+    width: 92px;
+    text-align: right;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+  }
+  .adj-summary {
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    background: var(--surface-alt);
+  }
+  .adj-summary strong {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-size: 13px;
+  }
+
   .update-banner {
     position: fixed;
     top: 0;
@@ -595,6 +666,7 @@
   <button type="button" id="updateReloadBtn">새로고침</button>
 </div>
 <div class="topbar" id="topbar"></div>
+<div class="datebar" id="dateBar"></div>
 <main id="screen-root"></main>
 <div class="save-toast" id="saveToast">저장되었습니다</div>
 
@@ -625,6 +697,9 @@
   });
   setInterval(checkForUpdate, 5 * 60 * 1000);
   checkForUpdate();
+
+  updateDateBar();
+  setInterval(updateDateBar, 30000);
 
   var DENOMS = [
     { id: "d100",label: "$100",cents: 10000, group: "note" },
@@ -692,6 +767,40 @@
 
   function clearDraft(pos) {
     localStorage.removeItem(DRAFT_PREFIX + pos);
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  function formatDateTimeDisplay() {
+    var d = new Date();
+    var days = ["일", "월", "화", "수", "목", "금", "토"];
+    return d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + days[d.getDay()] + ") · " +
+      pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
+  function updateDateBar() {
+    document.getElementById("dateBar").textContent = formatDateTimeDisplay();
+  }
+
+  var ADJ_PREFIX = "hanaro-till-adjustments-v1-";
+
+  function loadAdjustments(pos) {
+    try {
+      var raw = localStorage.getItem(ADJ_PREFIX + todayKey() + "-" + pos);
+      var obj = raw ? JSON.parse(raw) : null;
+      return { drop: (obj && obj.drop) || 0, expense: (obj && obj.expense) || 0, cashPaid: (obj && obj.cashPaid) || 0 };
+    } catch (e) {
+      return { drop: 0, expense: 0, cashPaid: 0 };
+    }
+  }
+
+  function saveAdjustments(pos, adj) {
+    localStorage.setItem(ADJ_PREFIX + todayKey() + "-" + pos, JSON.stringify(adj));
   }
 
   function showToast(msg) {
@@ -835,6 +944,19 @@
     });
 
     var counts = loadDraft(pos);
+    var adj = loadAdjustments(pos);
+
+    function adjRowHtml(key, label, hint) {
+      var dollars = adj[key] ? (adj[key] / 100).toFixed(2) : "";
+      return (
+        '<div class="adj-row">' +
+          '<span class="adj-row__label">' + label + (hint ? "<small>" + hint + "</small>" : "") + "</span>" +
+          '<span class="adj-row__input-wrap"><span>$</span>' +
+            '<input type="number" inputmode="decimal" min="0" step="0.01" class="adj-input" data-key="' + key + '" placeholder="0.00" value="' + dollars + '">' +
+          "</span>" +
+        "</div>"
+      );
+    }
 
     function rowsHtml(group) {
       return DENOMS.filter(function (d) { return d.group === group; }).map(function (d) {
@@ -854,6 +976,13 @@
     }
 
     root.innerHTML =
+      '<p class="section-label">오늘의 조정 (' + todayKey() + ')</p>' +
+      '<div class="adj-list">' +
+        adjRowHtml("drop", "드랍금", "금고에 넣어둔 금액") +
+        adjRowHtml("expense", "일반지출", "현금으로 낸 비용") +
+        adjRowHtml("cashPaid", "Cash Paid", "물건값 현금 지불") +
+        '<div class="adj-summary"><span>차감 합계</span><strong id="adjSumDisplay"></strong></div>' +
+      "</div>" +
       '<p class="section-label">지폐</p>' +
       '<div class="denom-list">' + rowsHtml("note") + "</div>" +
       '<p class="section-label">동전</p>' +
@@ -863,7 +992,7 @@
       '<div class="summary-bar"><div class="summary-bar__inner">' +
         '<div class="summary-bar__top">' +
           '<div class="summary-bar__totals">' +
-            '<div class="summary-bar__row"><span>목표 시제금</span><strong id="targetDisplay"></strong></div>' +
+            '<div class="summary-bar__row"><span>오늘 예상 시재</span><strong id="targetDisplay"></strong></div>' +
             '<div class="summary-bar__total-line" id="totalDisplay"></div>' +
           "</div>" +
           '<div class="status-pill" id="statusPill"></div>' +
@@ -873,6 +1002,16 @@
           (cfg.posCount > 1 ? '<button type="button" id="nextPosBtn"></button>' : "") +
         "</div>" +
       "</div></div>";
+
+    root.querySelectorAll(".adj-input").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var key = inp.getAttribute("data-key");
+        var v = parseFloat(inp.value);
+        adj[key] = isNaN(v) || v < 0 ? 0 : Math.round(v * 100);
+        saveAdjustments(pos, adj);
+        recalcAndPersist();
+      });
+    });
 
     document.getElementById("goHomeBtn").addEventListener("click", renderHome);
 
@@ -903,6 +1042,9 @@
       var total = 0;
       DENOMS.forEach(function (d) { total += (counts[d.id] || 0) * d.cents; });
 
+      var deducted = adj.drop + adj.expense + adj.cashPaid;
+      document.getElementById("adjSumDisplay").textContent = "−" + formatMoney(deducted).slice(1);
+
       var target = getTarget();
       document.getElementById("totalDisplay").textContent = "합계 " + formatMoney(total);
 
@@ -922,8 +1064,9 @@
       pill.style.color = "";
       pill.style.borderColor = "";
 
-      targetDisplay.textContent = formatMoney(target);
-      var diff = total - target;
+      var expected = target - deducted;
+      targetDisplay.textContent = formatMoney(expected);
+      var diff = total - expected;
       if (diff === 0) {
         pill.className = "status-pill match";
         pill.textContent = "✓ 일치";
