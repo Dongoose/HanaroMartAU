@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="app-version" content="2026-08-07T06:55:00Z">
 <title>시제금 계산 - 하나로마트</title>
 <style>
   :root {
@@ -557,10 +558,42 @@
     transition: opacity 0.2s ease;
   }
   .save-toast.show { opacity: 1; }
+
+  .update-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .update-banner.show { display: flex; }
+  .update-banner button {
+    background: var(--accent-contrast);
+    color: var(--accent);
+    border: none;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
 
+<div class="update-banner" id="updateBanner">
+  <span>새 버전이 있어요</span>
+  <button type="button" id="updateReloadBtn">새로고침</button>
+</div>
 <div class="topbar" id="topbar"></div>
 <main id="screen-root"></main>
 <div class="save-toast" id="saveToast">저장되었습니다</div>
@@ -571,6 +604,27 @@
 
   var STORAGE_KEY = "hanaro-till-config-v1";
   var DRAFT_PREFIX = "hanaro-till-draft-v1-";
+  var APP_VERSION = document.querySelector('meta[name="app-version"]').content;
+
+  function checkForUpdate() {
+    fetch(location.pathname + "?_=" + Date.now(), { cache: "no-store" })
+      .then(function (res) { return res.text(); })
+      .then(function (html) {
+        var match = html.match(/<meta name="app-version" content="([^"]+)"/);
+        if (match && match[1] !== APP_VERSION) {
+          document.getElementById("updateBanner").classList.add("show");
+        }
+      })
+      .catch(function () {});
+  }
+  document.getElementById("updateReloadBtn").addEventListener("click", function () {
+    location.reload();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") checkForUpdate();
+  });
+  setInterval(checkForUpdate, 5 * 60 * 1000);
+  checkForUpdate();
 
   var DENOMS = [
     { id: "d100",label: "$100",cents: 10000, group: "note" },
