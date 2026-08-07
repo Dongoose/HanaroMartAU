@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>시제금 계산 - 하나로마트</title>
+<style>
+  :root {
+    --bg: #f2f5f4;
+    --surface: #ffffff;
+    --surface-alt: #e8edeb;
+    --border: #d8e0dd;
+    --text: #16211e;
+    --text-muted: #5b6b66;
+    --accent: #1f6f6b;
+    --accent-hover: #185855;
+    --accent-contrast: #ffffff;
+    --success-bg: #e4f5ea;
+    --success-text: #1b7a43;
+    --success-border: #9fd9b7;
+    --danger-bg: #fbeae8;
+    --danger-text: #b23a2e;
+    --danger-border: #efb3ac;
+    --radius: 10px;
+    --font-ui: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1614;
+      --surface: #172420;
+      --surface-alt: #1e2c27;
+      --border: #2b3a35;
+      --text: #e7efec;
+      --text-muted: #9ab0a9;
+      --accent: #4fbfb3;
+      --accent-hover: #6ccfc4;
+      --accent-contrast: #06201d;
+      --success-bg: #12301f;
+      --success-text: #6fe0a0;
+      --success-border: #1f5a37;
+      --danger-bg: #341815;
+      --danger-text: #ff8a7a;
+      --danger-border: #6b2a22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1614;
+    --surface: #172420;
+    --surface-alt: #1e2c27;
+    --border: #2b3a35;
+    --text: #e7efec;
+    --text-muted: #9ab0a9;
+    --accent: #4fbfb3;
+    --accent-hover: #6ccfc4;
+    --accent-contrast: #06201d;
+    --success-bg: #12301f;
+    --success-text: #6fe0a0;
+    --success-border: #1f5a37;
+    --danger-bg: #341815;
+    --danger-text: #ff8a7a;
+    --danger-border: #6b2a22;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2f5f4;
+    --surface: #ffffff;
+    --surface-alt: #e8edeb;
+    --border: #d8e0dd;
+    --text: #16211e;
+    --text-muted: #5b6b66;
+    --accent: #1f6f6b;
+    --accent-hover: #185855;
+    --accent-contrast: #ffffff;
+    --success-bg: #e4f5ea;
+    --success-text: #1b7a43;
+    --success-border: #9fd9b7;
+    --danger-bg: #fbeae8;
+    --danger-text: #b23a2e;
+    --danger-border: #efb3ac;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  button, input {
+    font-family: inherit;
+    color: inherit;
+  }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar__back {
+    background: none;
+    border: none;
+    padding: 6px;
+    margin: -6px;
+    cursor: pointer;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+  }
+  .topbar__back:hover { background: var(--surface-alt); }
+  .topbar__titles { flex: 1; min-width: 0; }
+  .topbar__eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin: 0 0 2px;
+  }
+  .topbar__title {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar__gear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 8px;
+    margin: -8px;
+    border-radius: 8px;
+    display: flex;
+  }
+  .topbar__gear:hover { background: var(--surface-alt); color: var(--text); }
+
+  main {
+    flex: 1;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px 32px;
+  }
+
+  /* ---- setup ---- */
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .setup-card h1 {
+    font-size: 20px;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .setup-card p.lede {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 22px;
+    line-height: 1.5;
+  }
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .field .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 5px;
+  }
+  .text-input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+  }
+  .pos-count-picker {
+    display: flex;
+    gap: 8px;
+  }
+  .pos-count-picker button {
+    flex: 1;
+    padding: 12px 0;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+  .pos-count-picker button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 13px 0;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    width: 100%;
+    padding: 12px 0;
+    background: none;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: var(--surface-alt); }
+
+  /* ---- home ---- */
+  .home-heading {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 4px 0 14px;
+  }
+  .pos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+  }
+  .pos-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 12px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 92px;
+  }
+  .pos-btn:hover { border-color: var(--accent); }
+  .pos-btn__label {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .pos-btn__target {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ---- counting ---- */
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin: 22px 0 8px;
+  }
+  .section-label:first-child { margin-top: 0; }
+  .denom-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .denom-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .denom-row + .denom-row { border-top: 1px solid var(--border); }
+  .denom-row__label {
+    width: 62px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stepper button {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stepper button:hover { background: var(--surface-alt); }
+  .stepper input {
+    width: 48px;
+    text-align: center;
+    padding: 6px 2px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .denom-row__subtotal {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    color: var(--text-muted);
+    min-width: 72px;
+    text-align: right;
+  }
+
+  .reset-row {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .reset-link {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .count-spacer { height: 132px; }
+
+  .summary-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .summary-bar__inner {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .summary-bar__totals { flex: 1; min-width: 0; }
+  .summary-bar__row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .summary-bar__row strong {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .summary-bar__total-line {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-pill {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .status-pill.match {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
+  }
+  .status-pill.mismatch {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-border);
+  }
+
+  /* ---- settings ---- */
+  .settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .settings-section h2 {
+    font-size: 14px;
+    margin: 0 0 14px;
+  }
+  .pos-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+  }
+  .pos-row + .pos-row { border-top: 1px solid var(--border); }
+  .pos-row__label {
+    font-weight: 700;
+    font-size: 14px;
+    width: 56px;
+    flex-shrink: 0;
+  }
+  .pos-row__target-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pos-row__target-wrap span {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .pos-row input.target-input {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    min-width: 0;
+  }
+  .pos-row__remove {
+    background: none;
+    border: none;
+    color: var(--danger-text);
+    cursor: pointer;
+    padding: 8px;
+    margin: -8px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .pos-row__remove:hover { background: var(--danger-bg); }
+  .pos-row__remove:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .add-pos-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 0;
+    border: 1px dashed var(--border);
+    background: none;
+    border-radius: 8px;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .add-pos-btn:hover { background: var(--surface-alt); }
+  .add-pos-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .settings-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .save-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .save-toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar"></div>
+<main id="screen-root"></main>
+<div class="save-toast" id="saveToast">저장되었습니다</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "hanaro-till-config-v1";
+  var DRAFT_PREFIX = "hanaro-till-draft-v1-";
+
+  var DENOMS = [
+    { id: "d100",label: "$100",cents: 10000, group: "note" },
+    { id: "d50", label: "$50", cents: 5000, group: "note" },
+    { id: "d20", label: "$20", cents: 2000, group: "note" },
+    { id: "d10", label: "$10", cents: 1000, group: "note" },
+    { id: "d5",  label: "$5",  cents: 500,  group: "note" },
+    { id: "c2",  label: "$2",  cents: 200,  group: "coin" },
+    { id: "c1",  label: "$1",  cents: 100,  group: "coin" },
+    { id: "c050",label: "50¢", cents: 50,   group: "coin" },
+    { id: "c020",label: "20¢", cents: 20,   group: "coin" },
+    { id: "c010",label: "10¢", cents: 10,   group: "coin" },
+    { id: "c005",label: "5¢",  cents: 5,    group: "coin" }
+  ];
+
+  var root = document.getElementById("screen-root");
+  var topbar = document.getElementById("topbar");
+  var toastEl = document.getElementById("saveToast");
+  var toastTimer = null;
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function formatMoney(cents) {
+    var sign = cents < 0 ? "-" : "";
+    var abs = Math.abs(cents);
+    var dollars = Math.floor(abs / 100);
+    var rem = abs % 100;
+    var dollarsStr = dollars.toLocaleString("en-AU");
+    return sign + "$" + dollarsStr + "." + String(rem).padStart(2, "0");
+  }
+
+  function loadConfig() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var cfg = JSON.parse(raw);
+      if (!cfg || typeof cfg !== "object") return null;
+      return cfg;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveConfig(cfg) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+  }
+
+  function loadDraft(pos) {
+    try {
+      var raw = localStorage.getItem(DRAFT_PREFIX + pos);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveDraft(pos, counts) {
+    localStorage.setItem(DRAFT_PREFIX + pos, JSON.stringify(counts));
+  }
+
+  function clearDraft(pos) {
+    localStorage.removeItem(DRAFT_PREFIX + pos);
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toastEl.classList.remove("show");
+    }, 1600);
+  }
+
+  // ---------- topbar ----------
+  function renderTopbar(opts) {
+    // opts: { eyebrow, title, showBack, showGear, onBack, onGear }
+    topbar.innerHTML = "";
+    if (opts.showBack) {
+      var back = document.createElement("button");
+      back.className = "topbar__back";
+      back.setAttribute("aria-label", "뒤로");
+      back.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      back.addEventListener("click", opts.onBack);
+      topbar.appendChild(back);
+    }
+    var titles = document.createElement("div");
+    titles.className = "topbar__titles";
+    var eyebrowHtml = opts.eyebrow ? '<p class="topbar__eyebrow">' + escapeHtml(opts.eyebrow) + "</p>" : "";
+    titles.innerHTML = eyebrowHtml + '<p class="topbar__title">' + escapeHtml(opts.title) + "</p>";
+    topbar.appendChild(titles);
+    if (opts.showGear) {
+      var gear = document.createElement("button");
+      gear.className = "topbar__gear";
+      gear.setAttribute("aria-label", "설정");
+      gear.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19.4 13a7.97 7.97 0 000-2l2.1-1.65-2-3.46-2.5 1a8 8 0 00-1.73-1L14.9 3h-4l-.37 2.9a8 8 0 00-1.73 1l-2.5-1-2 3.46L6.4 11a8 8 0 000 2l-2.1 1.65 2 3.46 2.5-1a8 8 0 001.73 1l.37 2.9h4l.37-2.9a8 8 0 001.73-1l2.5 1 2-3.46L19.4 13z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>';
+      gear.addEventListener("click", opts.onGear);
+      topbar.appendChild(gear);
+    }
+  }
+
+  // ---------- setup screen (first run / when no config) ----------
+  function renderSetup(existingCfg) {
+    var cfg = existingCfg || { storeName: "", posCount: 1, targets: {} };
+    renderTopbar({ eyebrow: "하나로마트", title: "매장 설정", showBack: !!existingCfg, showGear: false,
+      onBack: function () { existingCfg ? renderHome() : null; } });
+
+    root.innerHTML =
+      '<div class="setup-card">' +
+        "<h1>이 기기의 매장 정보를 입력해주세요</h1>" +
+        '<p class="lede">한 번만 설정하면 이 기기(브라우저)에 계속 저장됩니다. 다른 기기에서는 각각 따로 설정해주세요.</p>' +
+        '<div class="field">' +
+          '<label for="storeNameInput">매장 이름</label>' +
+          '<input id="storeNameInput" class="text-input" type="text" placeholder="예: Eastwood 하나로마트" value="' + escapeHtml(cfg.storeName) + '">' +
+        "</div>" +
+        '<div class="field">' +
+          "<label>포스 개수</label>" +
+          '<div class="pos-count-picker" id="posCountPicker"></div>' +
+          '<p class="hint">목표 시제금은 다음 단계(설정 화면)에서 포스별로 입력할 수 있어요.</p>' +
+        "</div>" +
+        '<button class="btn-primary" id="setupSaveBtn">저장하고 시작하기</button>' +
+      "</div>";
+
+    var picker = document.getElementById("posCountPicker");
+    var selected = cfg.posCount || 1;
+    function renderPicker() {
+      picker.innerHTML = "";
+      for (var n = 1; n <= 5; n++) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = n;
+        if (n === selected) b.className = "active";
+        (function (num) {
+          b.addEventListener("click", function () {
+            selected = num;
+            renderPicker();
+          });
+        })(n);
+        picker.appendChild(b);
+      }
+    }
+    renderPicker();
+
+    document.getElementById("setupSaveBtn").addEventListener("click", function () {
+      var name = document.getElementById("storeNameInput").value.trim();
+      if (!name) {
+        document.getElementById("storeNameInput").focus();
+        return;
+      }
+      var targets = cfg.targets || {};
+      var newCfg = { storeName: name, posCount: selected, targets: targets };
+      saveConfig(newCfg);
+      renderHome();
+    });
+  }
+
+  // ---------- home screen ----------
+  function renderHome() {
+    var cfg = loadConfig();
+    if (!cfg) { renderSetup(null); return; }
+
+    renderTopbar({
+      eyebrow: "하나로마트",
+      title: cfg.storeName,
+      showBack: false,
+      showGear: true,
+      onGear: renderSettings
+    });
+
+    var buttons = "";
+    for (var n = 1; n <= cfg.posCount; n++) {
+      var target = cfg.targets && cfg.targets[n] != null ? cfg.targets[n] : null;
+      buttons +=
+        '<button class="pos-btn" data-pos="' + n + '">' +
+          '<span class="pos-btn__label">포스 ' + n + "</span>" +
+          '<span class="pos-btn__target">' + (target != null ? "목표 " + formatMoney(target) : "목표 미설정") + "</span>" +
+        "</button>";
+    }
+
+    root.innerHTML =
+      '<p class="home-heading">시제금을 계산할 포스를 선택하세요</p>' +
+      '<div class="pos-grid">' + buttons + "</div>";
+
+    var els = root.querySelectorAll(".pos-btn");
+    els.forEach(function (el) {
+      el.addEventListener("click", function () {
+        renderCounting(parseInt(el.getAttribute("data-pos"), 10));
+      });
+    });
+  }
+
+  // ---------- counting screen ----------
+  function renderCounting(pos) {
+    var cfg = loadConfig();
+    if (!cfg) { renderSetup(null); return; }
+
+    renderTopbar({
+      eyebrow: cfg.storeName,
+      title: "포스 " + pos + " 시제금",
+      showBack: true,
+      showGear: true,
+      onBack: renderHome,
+      onGear: renderSettings
+    });
+
+    var counts = loadDraft(pos);
+
+    function rowsHtml(group) {
+      return DENOMS.filter(function (d) { return d.group === group; }).map(function (d) {
+        var count = counts[d.id] || 0;
+        return (
+          '<div class="denom-row" data-id="' + d.id + '">' +
+            '<span class="denom-row__label">' + d.label + "</span>" +
+            '<span class="stepper">' +
+              '<button type="button" class="step-minus" aria-label="' + d.label + ' 감소">−</button>' +
+              '<input type="number" inputmode="numeric" min="0" step="1" class="count-input" value="' + count + '">' +
+              '<button type="button" class="step-plus" aria-label="' + d.label + ' 증가">+</button>' +
+            "</span>" +
+            '<span class="denom-row__subtotal" data-subtotal>' + formatMoney(count * d.cents) + "</span>" +
+          "</div>"
+        );
+      }).join("");
+    }
+
+    root.innerHTML =
+      '<p class="section-label">지폐</p>' +
+      '<div class="denom-list">' + rowsHtml("note") + "</div>" +
+      '<p class="section-label">동전</p>' +
+      '<div class="denom-list">' + rowsHtml("coin") + "</div>" +
+      '<div class="reset-row"><button class="reset-link" id="resetBtn">전체 초기화</button></div>' +
+      '<div class="count-spacer"></div>' +
+      '<div class="summary-bar"><div class="summary-bar__inner">' +
+        '<div class="summary-bar__totals">' +
+          '<div class="summary-bar__row"><span>목표 시제금</span><strong id="targetDisplay"></strong></div>' +
+          '<div class="summary-bar__total-line" id="totalDisplay"></div>' +
+        "</div>" +
+        '<div class="status-pill" id="statusPill"></div>' +
+      "</div></div>";
+
+    function getTarget() {
+      return cfg.targets && cfg.targets[pos] != null ? cfg.targets[pos] : null;
+    }
+
+    function updateRow(rowEl, d) {
+      var input = rowEl.querySelector(".count-input");
+      var n = parseInt(input.value, 10);
+      if (isNaN(n) || n < 0) n = 0;
+      input.value = n;
+      counts[d.id] = n;
+      rowEl.querySelector("[data-subtotal]").textContent = formatMoney(n * d.cents);
+    }
+
+    function recalcAndPersist() {
+      saveDraft(pos, counts);
+      var total = 0;
+      DENOMS.forEach(function (d) { total += (counts[d.id] || 0) * d.cents; });
+
+      var target = getTarget();
+      document.getElementById("totalDisplay").textContent = "합계 " + formatMoney(total);
+
+      var targetDisplay = document.getElementById("targetDisplay");
+      var pill = document.getElementById("statusPill");
+
+      if (target == null) {
+        targetDisplay.textContent = "미설정";
+        pill.className = "status-pill";
+        pill.textContent = "설정에서 목표 입력";
+        pill.style.background = "var(--surface-alt)";
+        pill.style.color = "var(--text-muted)";
+        pill.style.borderColor = "var(--border)";
+        return;
+      }
+      pill.style.background = "";
+      pill.style.color = "";
+      pill.style.borderColor = "";
+
+      targetDisplay.textContent = formatMoney(target);
+      var diff = total - target;
+      if (diff === 0) {
+        pill.className = "status-pill match";
+        pill.textContent = "✓ 일치";
+      } else {
+        pill.className = "status-pill mismatch";
+        pill.textContent = (diff > 0 ? "+" : "−") + formatMoney(Math.abs(diff)).slice(1);
+      }
+    }
+
+    root.querySelectorAll(".denom-row").forEach(function (rowEl) {
+      var id = rowEl.getAttribute("data-id");
+      var d = DENOMS.filter(function (x) { return x.id === id; })[0];
+      var input = rowEl.querySelector(".count-input");
+
+      rowEl.querySelector(".step-minus").addEventListener("click", function () {
+        var n = Math.max(0, (parseInt(input.value, 10) || 0) - 1);
+        input.value = n;
+        updateRow(rowEl, d);
+        recalcAndPersist();
+      });
+      rowEl.querySelector(".step-plus").addEventListener("click", function () {
+        var n = (parseInt(input.value, 10) || 0) + 1;
+        input.value = n;
+        updateRow(rowEl, d);
+        recalcAndPersist();
+      });
+      input.addEventListener("input", function () {
+        updateRow(rowEl, d);
+        recalcAndPersist();
+      });
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      if (!confirm("입력한 개수를 모두 초기화할까요?")) return;
+      counts = {};
+      clearDraft(pos);
+      renderCounting(pos);
+    });
+
+    recalcAndPersist();
+  }
+
+  // ---------- settings screen ----------
+  function renderSettings() {
+    var cfg = loadConfig();
+    if (!cfg) { renderSetup(null); return; }
+
+    renderTopbar({
+      eyebrow: cfg.storeName,
+      title: "설정",
+      showBack: true,
+      showGear: false,
+      onBack: renderHome
+    });
+
+    var workingTargets = {};
+    for (var k in cfg.targets) workingTargets[k] = cfg.targets[k];
+    var workingPosCount = cfg.posCount;
+
+    root.innerHTML =
+      '<div class="settings-section">' +
+        "<h2>매장 이름</h2>" +
+        '<input id="storeNameInput" class="text-input" type="text" value="' + escapeHtml(cfg.storeName) + '">' +
+      "</div>" +
+      '<div class="settings-section">' +
+        "<h2>포스 및 목표 시제금</h2>" +
+        '<div id="posRows"></div>' +
+        '<button class="add-pos-btn" id="addPosBtn" type="button">+ 포스 추가</button>' +
+      "</div>" +
+      '<div class="settings-actions">' +
+        '<button class="btn-primary" id="settingsSaveBtn">저장</button>' +
+        '<button class="btn-secondary" id="settingsCancelBtn">취소</button>' +
+      "</div>";
+
+    function renderPosRows() {
+      var container = document.getElementById("posRows");
+      var html = "";
+      for (var n = 1; n <= workingPosCount; n++) {
+        var cents = workingTargets[n];
+        var dollarsVal = cents != null ? (cents / 100).toFixed(2) : "";
+        html +=
+          '<div class="pos-row">' +
+            '<span class="pos-row__label">포스 ' + n + "</span>" +
+            '<span class="pos-row__target-wrap"><span>$</span>' +
+              '<input type="number" inputmode="decimal" min="0" step="0.01" class="target-input" data-pos="' + n + '" placeholder="목표 시제금" value="' + dollarsVal + '">' +
+            "</span>" +
+            '<button type="button" class="pos-row__remove" data-remove="' + n + '" aria-label="포스 ' + n + ' 삭제" ' + (workingPosCount <= 1 ? "disabled" : "") + '>' +
+              '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+            "</button>" +
+          "</div>";
+      }
+      container.innerHTML = html;
+
+      container.querySelectorAll(".target-input").forEach(function (inp) {
+        inp.addEventListener("input", function () {
+          var pos = inp.getAttribute("data-pos");
+          var v = parseFloat(inp.value);
+          if (isNaN(v) || v < 0) {
+            delete workingTargets[pos];
+          } else {
+            workingTargets[pos] = Math.round(v * 100);
+          }
+        });
+      });
+      container.querySelectorAll("[data-remove]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          if (workingPosCount <= 1) return;
+          var removed = parseInt(btn.getAttribute("data-remove"), 10);
+          var newTargets = {};
+          for (var n = 1; n <= workingPosCount; n++) {
+            if (n === removed) continue;
+            var newIndex = n > removed ? n - 1 : n;
+            if (workingTargets[n] != null) newTargets[newIndex] = workingTargets[n];
+          }
+          workingTargets = newTargets;
+          workingPosCount -= 1;
+          renderPosRows();
+          updateAddBtn();
+        });
+      });
+    }
+
+    function updateAddBtn() {
+      var addBtn = document.getElementById("addPosBtn");
+      addBtn.disabled = workingPosCount >= 5;
+      addBtn.textContent = workingPosCount >= 5 ? "포스는 최대 5개까지 가능합니다" : "+ 포스 추가";
+    }
+
+    renderPosRows();
+    updateAddBtn();
+
+    document.getElementById("addPosBtn").addEventListener("click", function () {
+      if (workingPosCount >= 5) return;
+      workingPosCount += 1;
+      renderPosRows();
+      updateAddBtn();
+    });
+
+    document.getElementById("settingsCancelBtn").addEventListener("click", renderHome);
+
+    document.getElementById("settingsSaveBtn").addEventListener("click", function () {
+      var name = document.getElementById("storeNameInput").value.trim();
+      if (!name) {
+        document.getElementById("storeNameInput").focus();
+        return;
+      }
+      var newCfg = { storeName: name, posCount: workingPosCount, targets: workingTargets };
+      saveConfig(newCfg);
+      showToast("저장되었습니다");
+      renderHome();
+    });
+  }
+
+  // ---------- boot ----------
+  var initial = loadConfig();
+  if (!initial) {
+    renderSetup(null);
+  } else {
+    renderHome();
+  }
+})();
+</script>
+</body>
+</html>
