@@ -10,6 +10,7 @@
  *
  * The page counts one product (Wagyu). Its average weight, price and the
  * manager PIN live in the Settings tab, so they can change without a redeploy.
+ * Any difference that is not 0 (short or over) is shown in red in the Log.
  */
 
 const TZ = 'Australia/Brisbane';
@@ -27,6 +28,7 @@ const SETTING_ROWS = [
   ['Page title', PRODUCT + ' Stock Check', '@', 'Shown at the top of the page.']
 ];
 const DEFAULT_AVG_KG = 0.1425;
+const RULES_VERSION = '2';   // bump when applyRules_ changes, so existing sheets pick it up
 
 const COL = {
   id: 1, at: 2, by: 3, product: 4, count: 5, avgKg: 6, totalKg: 7,
@@ -102,22 +104,43 @@ function ensureSettings_(set) {
   });
 }
 
+/**
+ * Red background on Difference (units / kg / $) whenever the count and the
+ * manager stock don't match: short (minus) or over (plus). Blank cells stay plain.
+ */
 function applyRules_(log) {
   const rows = Math.max(log.getMaxRows() - 1, 1);
-  const neg = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberLessThan(0)
-    .setBackground('#fde4e1').setFontColor('#a8231a')
-    .setRanges([
-      log.getRange(2, COL.diff, rows, 2),
-      log.getRange(2, COL.diffCost, rows, 1)
-    ])
-    .build();
+  const mismatch = (col, width) => {
+    const a1 = colLetter_(col) + '2';
+    return SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(ISNUMBER(' + a1 + '),' + a1 + '<>0)')
+      .setBackground('#fde4e1').setFontColor('#a8231a')
+      .setRanges([log.getRange(2, col, rows, width)])
+      .build();
+  };
   const keep = log.getConditionalFormatRules().filter(r => {
     const ranges = r.getRanges();
     return !ranges.some(g => g.getColumn() === COL.diff || g.getColumn() === COL.diffCost);
   });
-  keep.push(neg);
+  keep.push(mismatch(COL.diff, 2), mismatch(COL.diffCost, 1));
   log.setConditionalFormatRules(keep);
+  PropertiesService.getScriptProperties().setProperty('rulesVersion', RULES_VERSION);
+}
+
+/** Bring the red-difference rule up to date on sheets set up with older code. */
+function ensureRules_() {
+  try {
+    if (PropertiesService.getScriptProperties().getProperty('rulesVersion') === RULES_VERSION) return;
+    applyRules_(logSheet_());
+  } catch (e) {
+    // formatting must never stop the page from opening
+  }
+}
+
+function colLetter_(n) {
+  let s = '';
+  for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  return s;
 }
 
 function ensureRows_(sheet, lastNeeded) {
@@ -131,6 +154,7 @@ function ensureRows_(sheet, lastNeeded) {
 /* ---------------------------------------------------------------- web app */
 
 function doGet() {
+  ensureRules_();
   const cfg = config_();
   const t = HtmlService.createTemplateFromFile('Index');
   t.pageTitle = cfg.title;
@@ -200,7 +224,7 @@ function getRecent(pin, limit) {
   checkPin_(pin);
   const log = logSheet_();
   const last = log.getLastRow();
-  if (last < 2) return { rows: [] };
+  if (last < 2) return { rows: [], total: 0 };
 
   const span = Math.min(last - 1, 3000);
   const vals = log.getRange(last - span + 1, 1, span, LOG_HEADERS.length).getValues();
@@ -225,7 +249,7 @@ function getRecent(pin, limit) {
     });
   });
   rows.sort((a, b) => (b.atMs - a.atMs) || (b.idx - a.idx));
-  return { rows: rows.slice(0, max) };
+  return { rows: rows.slice(0, max), total: rows.length };
 }
 
 function setStock(pin, id, value) {
@@ -248,8 +272,30 @@ function setStock(pin, id, value) {
     const now = new Date();
     log.getRange(r, COL.stock).setValue(v);
     log.getRange(r, COL.mgrAt).setValue(v === '' ? '' : now).setNumberFormat(DATE_FMT);
+    applyRules_(log);
     SpreadsheetApp.flush();
     return { ok: true, id: String(id), stock: v, at: v === '' ? '' : Utilities.formatDate(now, TZ, SHOW_FMT) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Manager: delete every count in the Log tab and start again.
+ * The header row, the Settings tab and the PIN stay. The page asks "Are you sure?" first.
+ */
+function resetAll(pin) {
+  checkPin_(pin);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const log = logSheet_();
+    const last = log.getLastRow();
+    const n = last > 1 ? last - 1 : 0;
+    if (n) log.getRange(2, 1, n, Math.max(log.getLastColumn(), LOG_HEADERS.length)).clearContent();
+    applyRules_(log);
+    SpreadsheetApp.flush();
+    return { ok: true, cleared: n };
   } finally {
     lock.releaseLock();
   }

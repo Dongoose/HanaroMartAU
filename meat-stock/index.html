@@ -11,22 +11,22 @@
 <style>
   /* Layout: one reading column; the live phone preview sits beside the role summary on wide screens and stacks on phones */
   :root {
-    --bg: #f7f7f5; --surface: #ffffff; --ink: #1c1917; --muted: #6a6460; --line: #e5e1dd;
-    --accent: #8c2a20; --accent-soft: #f5e8e5; --code-bg: #f0efec; --ok: #1d6b45; --ok-soft: #e3f2e9; --on-fill: #ffffff;
+    --bg: #f4f7f3; --surface: #ffffff; --ink: #172015; --muted: #566352; --line: #dde5da;
+    --accent: #307029; --accent-soft: #e4f1e1; --code-bg: #eef2ec; --ok: #275a21; --ok-soft: #e4f1e1; --on-fill: #ffffff;
     --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #151312; --surface: #1d1a19; --ink: #f0ebe7; --muted: #a39992; --line: #322d2a;
-      --accent: #e0675a; --accent-soft: #2c1d1a; --code-bg: #211e1c; --ok: #7fd4a4; --ok-soft: #15291f; --on-fill: #1a0f0d;
+      --bg: #0f150e; --surface: #182017; --ink: #eef3ec; --muted: #a6b2a2; --line: #2a3428;
+      --accent: #5ec752; --accent-soft: #1d2e1b; --code-bg: #141b13; --ok: #86d97b; --ok-soft: #15291a; --on-fill: #0c1a0a;
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #151312; --surface: #1d1a19; --ink: #f0ebe7; --muted: #a39992; --line: #322d2a;
-    --accent: #e0675a; --accent-soft: #2c1d1a; --code-bg: #211e1c; --ok: #7fd4a4; --ok-soft: #15291f; --on-fill: #1a0f0d;
+    --bg: #0f150e; --surface: #182017; --ink: #eef3ec; --muted: #a6b2a2; --line: #2a3428;
+    --accent: #5ec752; --accent-soft: #1d2e1b; --code-bg: #141b13; --ok: #86d97b; --ok-soft: #15291a; --on-fill: #0c1a0a;
     color-scheme: dark;
   }
 
@@ -60,7 +60,7 @@
   @media (min-width: 820px) { .split { grid-template-columns: 372px minmax(0, 1fr); gap: 36px; } }
   .phone {
     width: 100%; max-width: 372px; margin: 0 auto; border: 6px solid var(--ink); border-radius: 30px;
-    overflow: hidden; background: var(--bg); box-shadow: 0 12px 32px rgba(28, 25, 23, .14); position: relative;
+    overflow: hidden; background: var(--bg); box-shadow: 0 12px 32px rgba(23, 32, 21, .16); position: relative;
   }
   .phone iframe { display: block; width: 100%; height: 700px; border: 0; background: var(--bg); }
   .phone-msg { height: 700px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-size: 14px; }
@@ -159,7 +159,7 @@
             <li>이름은 한 번만 쓰면 그 폰에 기억돼요.</li>
             <li>진열 보충, 입고, 폐기는 메모에 한 줄.</li>
             <li>이전 개수는 안 보여줘요. 보고 따라 적는 걸 막으려고요.</li>
-            <li>맨 위 ‹ › 화살표로 이전·다음 화면, 오른쪽 위 집 모양 버튼으로 첫 화면(개수 입력)에 가요.</li>
+            <li>맨 위 ‹ › 화살표로 이전·다음 화면. 집 모양 버튼이나 로고·제목을 누르면 첫 화면(개수 입력)으로 가요.</li>
           </ul>
         </div>
         <div class="role">
@@ -176,6 +176,7 @@
             <li>같은 링크 하단 Manager → PIN 입력.</li>
             <li>기록마다 있어야 할 개수(POS, 입고 기준)를 넣으면 차이가 개수, kg, $로 나와요.</li>
             <li>상단에 부족분 합계, 아래는 날짜별 기록.</li>
+            <li>맨 아래 <b>Reset all data</b>: "Are you sure…?"에서 한 번 더 확인하면 Log 기록을 전부 지우고 새로 시작해요.</li>
           </ul>
         </div>
         <p class="formula">차이 = 카운트 − 매니저 재고<br><b>−2</b> 이면 2개가 비는 것. CCTV는 <b>직전 카운트 시각 → 이번 카운트 시각</b> 사이를 보면 돼요.</p>
@@ -263,7 +264,7 @@
       <span class="eyebrow">Sheet</span>
       <h2 id="h-sheet">시트에 쌓이는 것</h2>
     </div>
-    <p class="muted">Log 탭에 저장 한 번에 한 줄씩. 차이가 마이너스인 칸은 빨갛게 표시돼요.</p>
+    <p class="muted">Log 탭에 저장 한 번에 한 줄씩. 카운트와 매니저 재고가 안 맞으면(부족이든 초과든) 차이 칸이 빨갛게 표시돼요.</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>구분</th><th>열</th><th>누가 채우나</th></tr></thead>
@@ -287,7 +288,8 @@
       <li>폰 시계를 바꿔도 기록 시각은 서버 기준이라 영향이 없어요.</li>
       <li>진열 보충이나 입고 직후 카운트는 메모가 있어야 변동이 설명돼요. 메모 없이 개수가 줄었는데 POS 판매량보다 많이 줄었다면 그 구간이 CCTV 후보예요.</li>
       <li>매니저 PIN은 10번 틀리면 15분 잠겨요. 가벼운 잠금이라 PIN은 팀 채팅에 올리지 마세요.</li>
-      <li>코드를 고칠 일이 생기면 <span class="path">배포 → 배포 관리 → 연필 → 버전: 새 버전 → 배포</span>. 링크는 그대로 유지돼요.</li>
+      <li>코드를 바꿀 때는 두 파일을 붙여넣고 저장한 뒤 <span class="path">배포 → 배포 관리 → 연필 → 버전: 새 버전 → 배포</span>. 링크는 그대로 유지되고, 시트의 빨간 표시 규칙은 다음에 페이지를 열 때 자동으로 새로 맞춰져요.</li>
+      <li>Reset으로 지운 기록은 시트의 <span class="path">파일 → 버전 기록</span>에서 지우기 전 버전을 열어 되돌릴 수 있어요.</li>
       <li>예전 여러 품목 버전을 이미 설치했다면 두 파일을 이 코드로 바꾸고 setup을 한 번 더 실행한 뒤 새 버전으로 배포하세요. 기존 Log는 그대로 쓰고, Settings에 무게와 가격 줄이 추가돼요. Products 탭은 지워도 돼요.</li>
       <li>지금은 와규 전용 화면이에요. Log에 Product 열을 남겨 둬서 나중에 품목을 늘려도 기존 기록을 그대로 쓸 수 있어요.</li>
     </ul>
@@ -353,7 +355,13 @@
       },
       getRecent: function (pin) {
         if (String(pin).trim() !== S.pin) throw new Error('Wrong PIN. (The preview PIN is ' + S.pin + ')');
-        return { rows: rows.slice().sort(function (a, b) { return (b.atMs - a.atMs) || (b.n - a.n); }) };
+        return { rows: rows.slice().sort(function (a, b) { return (b.atMs - a.atMs) || (b.n - a.n); }), total: rows.length };
+      },
+      resetAll: function (pin) {
+        if (String(pin).trim() !== S.pin) throw new Error('Wrong PIN. (The preview PIN is ' + S.pin + ')');
+        var n = rows.length;
+        rows.length = 0;
+        return { ok: true, cleared: n };
       },
       setStock: function (pin, id, v) {
         var r = rows.filter(function (x) { return x.id === id; })[0];
@@ -440,7 +448,7 @@
     metas[1].textContent += ' · ' + src.html.split('\n').length + '줄';
     document.querySelectorAll('.copy').forEach(function (b) { b.disabled = false; b.textContent = b.dataset.label; });
     try {
-      frame.srcdoc = buildPreview(src.html);
+      frame.srcdoc = buildPreview(src.previewHtml || src.html);
       frame.hidden = false; msg.hidden = true;
     } catch (e) {
       msg.textContent = '미리보기를 만들지 못했어요. 코드 복사는 그대로 쓸 수 있어요.';

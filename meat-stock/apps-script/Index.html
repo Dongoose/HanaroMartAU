@@ -6,96 +6,115 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= pageTitle ?></title>
 <style>
-  /* One narrow column: the Wagyu counter is the hero, name and note sit under it, Save closes the form. */
+  /* Hanaromart look: a deep brand-green app bar carrying the logo, light cards below,
+     one green primary action per screen; red is kept for mismatches and the reset. */
   :root {
-    --bg: #f5f1ed; --card: #ffffff; --ink: #1f1a18; --muted: #675d56; --line: #e4dbd3; --line-strong: #948780;
-    --accent: #8c2a20; --accent-press: #73221a; --accent-ink: #ffffff; --soft: #f6e8e4;
-    --neg: #a8231a; --neg-bg: #fde4e1; --pos: #1d6b45; --pos-bg: #e1f3e8; --warn: #7a4f00; --warn-bg: #fbefd5;
+    --brand: #49a93e;
+    --bar: #307029; --on-bar: #ffffff; --bar-press: rgba(255, 255, 255, .18);
+    --primary: #307029; --primary-press: #275a21; --on-primary: #ffffff; --primary-soft: #e4f1e1;
+    --bg: #f4f7f3; --card: #ffffff; --ink: #172015; --muted: #566352; --line: #dde5da; --line-strong: #839080;
+    --neg: #b42318; --on-neg: #ffffff; --neg-bg: #fde7e4; --pos: #23692c; --pos-bg: #e4f1e1; --warn: #7a4f00; --warn-bg: #fbefd5;
+    --scrim: rgba(12, 20, 10, .55);
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141110; --card: #1e1a19; --ink: #f2ece8; --muted: #ab9f98; --line: #352f2c; --line-strong: #766a64;
-      --accent: #e0675a; --accent-press: #c9584b; --accent-ink: #1a0f0d; --soft: #2d201e;
-      --neg: #ff8a7d; --neg-bg: #3a1c18; --pos: #7fd4a4; --pos-bg: #15291f; --warn: #f0c060; --warn-bg: #2e2412;
+      --bar: #1c3319; --on-bar: #ffffff; --bar-press: rgba(255, 255, 255, .14);
+      --primary: #5ec752; --primary-press: #4fb543; --on-primary: #0c1a0a; --primary-soft: #1d2e1b;
+      --bg: #0f150e; --card: #182017; --ink: #eef3ec; --muted: #a6b2a2; --line: #2a3428; --line-strong: #6b7867;
+      --neg: #ff8a7d; --on-neg: #2a0d0a; --neg-bg: #3a1c18; --pos: #86d97b; --pos-bg: #15291a; --warn: #f0c060; --warn-bg: #2e2412;
+      --scrim: rgba(0, 0, 0, .65);
       color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
+  html { scroll-padding-top: 76px; }
   html, body { margin: 0; background: var(--bg); color: var(--ink); }
   body {
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-text-size-adjust: 100%;
     padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   }
+  body.modal-open { overflow: hidden; }
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   button:disabled { cursor: default; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+  main:focus, h2:focus { outline: none; }
   [hidden] { display: none !important; }
   svg { display: block; flex: none; }
   .num { font-variant-numeric: tabular-nums; }
   .sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; padding: 0; }
 
-  .wrap {
-    max-width: 520px; margin: 0 auto;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  /* ---------- app bar: Back / Forward, logo + title (both go home), Home ---------- */
+  .appbar { position: sticky; top: 0; z-index: 5; background: var(--bar); color: var(--on-bar); padding-top: env(safe-area-inset-top, 0px); }
+  .appbar-in {
+    max-width: 540px; margin: 0 auto; min-height: 64px; display: flex; align-items: center; gap: 2px;
+    padding-left: max(4px, env(safe-area-inset-left, 0px)); padding-right: max(4px, env(safe-area-inset-right, 0px));
   }
-  .stack { display: flex; flex-direction: column; gap: 12px; }
-
-  /* header: Back / Forward on the left, page title + Brisbane clock, Home on the right */
-  header.top { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
-  .navbtns { display: flex; gap: 8px; flex: none; }
-  .navbtn, .homebtn {
-    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  .iconbtn {
+    width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--on-bar);
+    display: grid; place-items: center; flex: none; transition: background-color .15s ease-out;
+  }
+  .iconbtn:active:not([aria-disabled="true"]) { background: var(--bar-press); }
+  .iconbtn[aria-disabled="true"] { opacity: .4; cursor: default; }
+  .appbar :focus-visible { outline: 2px solid var(--on-bar); outline-offset: -2px; }
+  .brand { flex: 1; min-width: 0; margin: 0; font-size: inherit; font-weight: inherit; }
+  .brand-btn {
+    width: 100%; min-height: 52px; display: flex; align-items: center; gap: 8px; padding: 4px;
+    border: 0; border-radius: 12px; background: transparent; color: var(--on-bar); text-align: left;
     transition: background-color .15s ease-out;
   }
-  .navbtn { border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); }
-  .navbtn:active:not([aria-disabled="true"]) { background: var(--line); }
-  .navbtn[aria-disabled="true"] { opacity: .35; cursor: default; }
-  .homebtn { border: 0; background: var(--accent); color: var(--accent-ink); }
-  .homebtn:active { background: var(--accent-press); }
-  .titles { flex: 1; min-width: 0; }
-  h1 { font-size: 16px; line-height: 1.25; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  h1:focus, h2:focus { outline: none; }
-  .clock { font-size: 13px; line-height: 1.3; color: var(--muted); white-space: nowrap; }
+  .brand-btn:active { background: var(--bar-press); }
+  .logo { width: 34px; height: 34px; border-radius: 8px; flex: none; display: block; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .45); }
+  .brand-text { display: flex; flex-direction: column; min-width: 0; }
+  .app-name { font-size: 15px; font-weight: 800; line-height: 1.2; letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .store { font-size: 11px; font-weight: 700; line-height: 1.35; letter-spacing: .14em; text-transform: uppercase; opacity: .9; white-space: nowrap; }
 
-  /* success after save */
+  /* ---------- page ---------- */
+  .wrap {
+    max-width: 520px; margin: 0 auto; padding-top: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+
   .saved { display: flex; gap: 10px; align-items: flex-start; background: var(--pos-bg); color: var(--pos); border-radius: 14px; padding: 12px 14px; }
   .saved b { display: block; font-size: 16px; }
   .saved span { font-size: 14px; }
   .saved svg { margin-top: 1px; }
 
   /* the counter */
-  .counter { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 16px 14px; }
-  .c-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .c-name { font-size: 22px; font-weight: 700; line-height: 1.2; }
-  .c-each { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .counter { padding: 16px 16px 14px; }
+  .c-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .c-name { font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; }
+  .chip { font-size: 13px; font-weight: 600; color: var(--pos); background: var(--primary-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
   .stepper { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 10px; align-items: center; margin: 14px 0 10px; }
   .stepbtn {
-    height: 64px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--bg);
-    display: grid; place-items: center; color: var(--ink); transition: background-color .15s ease-out;
+    height: 64px; border-radius: 16px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink);
+    display: grid; place-items: center; transition: background-color .15s ease-out, color .15s ease-out;
   }
+  .stepbtn.plus { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
   .stepbtn:active:not([aria-disabled="true"]) { background: var(--line); }
+  .stepbtn.plus:active:not([aria-disabled="true"]) { background: var(--primary); color: var(--on-primary); }
   .stepbtn[aria-disabled="true"] { opacity: .4; cursor: default; }
   .qty {
-    width: 100%; height: 64px; text-align: center; font-size: 40px; font-weight: 700; letter-spacing: -.01em;
-    border: 1.5px solid var(--line-strong); border-radius: 14px; background: var(--card); outline: none;
+    width: 100%; height: 64px; text-align: center; font-size: 40px; font-weight: 800; letter-spacing: -.01em;
+    border: 1.5px solid var(--line-strong); border-radius: 16px; background: var(--card); outline: none;
     font-variant-numeric: tabular-nums; padding: 0 4px;
   }
   .kg-line { margin: 0; text-align: center; font-size: 15px; color: var(--muted); min-height: 22px; }
 
   /* name and note */
-  .fields { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .fields { display: flex; flex-direction: column; gap: 14px; }
   .field-wrap { display: flex; flex-direction: column; gap: 6px; }
   label.lab { font-size: 14px; font-weight: 600; }
   .opt { font-weight: 400; color: var(--muted); }
   input.field {
-    width: 100%; height: 48px; border: 1px solid var(--line-strong); border-radius: 10px;
+    width: 100%; height: 48px; border: 1px solid var(--line-strong); border-radius: 12px;
     background: var(--bg); padding: 0 12px; font-size: 16px; outline: none;
   }
-  input.field:focus, .qty:focus, .stock-in:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--soft); }
+  input.field:focus, .qty:focus, .stock-in:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   [aria-invalid="true"] { border-color: var(--neg) !important; }
   .nudge { animation: nudge .3s; }
   @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
@@ -103,12 +122,29 @@
   .field-err svg { margin-top: 1px; }
   .counter .field-err { justify-content: center; margin-top: 6px; }
 
+  /* buttons */
   .primary {
-    width: 100%; height: 56px; border: 0; border-radius: 14px; background: var(--accent); color: var(--accent-ink);
+    width: 100%; height: 56px; border: 0; border-radius: 14px; background: var(--primary); color: var(--on-primary);
     font-weight: 700; font-size: 17px; transition: background-color .15s ease-out;
   }
-  .primary:active:not(:disabled) { background: var(--accent-press); }
+  .primary:active:not(:disabled) { background: var(--primary-press); }
   .primary:disabled { opacity: .6; }
+  .secondary {
+    min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card);
+    font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background-color .15s ease-out;
+  }
+  .secondary:active:not(:disabled) { background: var(--line); }
+  .secondary:disabled, .danger-btn:disabled { opacity: .6; }
+  .danger-btn {
+    min-height: 48px; padding: 0 16px; border-radius: 12px; border: 0; background: var(--neg); color: var(--on-neg);
+    font-weight: 700; font-size: 15px;
+  }
+  .danger-outline {
+    min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--neg); background: transparent; color: var(--neg);
+    font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: flex-start;
+  }
+  .danger-outline:active { background: var(--neg-bg); }
   .hint { margin: 0; font-size: 14px; color: var(--muted); text-align: center; }
   .linkbtn {
     align-self: center; min-height: 44px; padding: 0 14px; background: none; border: 0; color: var(--muted);
@@ -116,27 +152,20 @@
   }
 
   .toast {
-    position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 10;
-    transform: translate(-50%, calc(-100% - 24px)); visibility: hidden;
-    transition: transform .2s ease-out, visibility 0s .2s;
+    position: fixed; left: 50%; top: calc(76px + env(safe-area-inset-top, 0px)); z-index: 30;
+    transform: translate(-50%, -12px); opacity: 0; visibility: hidden;
+    transition: transform .2s ease-out, opacity .2s ease-out, visibility 0s .2s;
     width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px;
     background: var(--ink); color: var(--bg); font-size: 15px; text-align: center;
   }
-  .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .2s ease-out; }
-  .toast.err { background: var(--neg); color: var(--card); }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition: transform .2s ease-out, opacity .2s ease-out; }
+  .toast.err { background: var(--neg); color: var(--on-neg); }
 
-  /* manager */
+  /* ---------- manager ---------- */
   .mgr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
-  .mgr-head h2 { font-size: 20px; margin: 0; }
+  .mgr-head h2 { font-size: 22px; font-weight: 800; margin: 0; }
   #refresh[aria-busy="true"] svg { animation: spin .9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .ghost {
-    min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--card);
-    font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; justify-self: start;
-  }
-  .ghost:active:not(:disabled) { background: var(--line); }
-  .ghost:disabled { opacity: .6; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
   .pinrow { display: flex; gap: 8px; }
   .pinrow .field { flex: 1; min-width: 0; }
   .pinrow .primary { width: auto; min-width: 104px; height: 48px; padding: 0 16px; font-size: 16px; }
@@ -144,74 +173,96 @@
   .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .tot { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
   .tot .k { font-size: 13px; color: var(--muted); }
-  .tot .v { font-size: 22px; font-weight: 700; }
+  .tot .v { font-size: 22px; font-weight: 800; }
   .tot.bad .v { color: var(--neg); }
   .totals .muted { grid-column: 1 / -1; }
-  .day { margin: 8px 2px 0; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .day { margin: 8px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .entry { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
   .e-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .e-time { font-size: 18px; font-weight: 700; }
+  .e-time { font-size: 18px; font-weight: 800; }
   .e-by { font-size: 14px; color: var(--muted); text-align: right; overflow-wrap: anywhere; }
   .e-line { margin: 0; font-size: 15px; }
   .e-line .muted { font-size: 15px; }
   .e-cctv { margin: 0; font-size: 14px; color: var(--muted); }
   .e-note { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; overflow-wrap: anywhere; }
-  .chg-neg { color: var(--neg); font-weight: 600; }
-  .chg-pos { color: var(--pos); font-weight: 600; }
+  .chg-neg { color: var(--neg); font-weight: 700; }
+  .chg-pos { color: var(--pos); font-weight: 700; }
   .e-stock { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .e-stock label { font-size: 14px; color: var(--muted); }
   .stock-in {
     width: 72px; height: 44px; text-align: center; font-size: 18px; font-weight: 700; border: 1px solid var(--line-strong);
     border-radius: 10px; background: var(--bg); outline: none; font-variant-numeric: tabular-nums;
   }
-  .pill { font-size: 13px; padding: 5px 10px; border-radius: 999px; font-weight: 600; }
+  .pill { font-size: 13px; padding: 5px 10px; border-radius: 999px; font-weight: 700; }
   .pill.neg { background: var(--neg-bg); color: var(--neg); }
   .pill.pos { background: var(--warn-bg); color: var(--warn); }
   .pill.ok { background: var(--pos-bg); color: var(--pos); }
   .pill.wait { background: var(--bg); color: var(--muted); font-weight: 500; }
   .empty { margin: 0; padding: 18px 14px; color: var(--muted); background: var(--card); border: 1px dashed var(--line-strong); border-radius: 16px; text-align: center; }
+  .danger { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .danger h3 { margin: 0; font-size: 16px; }
+
+  /* ---------- reset dialog ---------- */
+  .scrim {
+    position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; place-items: center;
+    padding: 20px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px));
+  }
+  .dialog {
+    width: 100%; max-width: 400px; background: var(--card); border-radius: 20px; padding: 20px;
+    display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, .3); animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  .dlg-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--neg-bg); color: var(--neg); display: grid; place-items: center; }
+  .dialog h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+  .dialog p { margin: 0; font-size: 15px; color: var(--muted); }
+  .dialog .field-err { color: var(--neg); }
+  .dlg-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .dlg-actions .secondary { min-height: 48px; }
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <nav class="navbtns" aria-label="Back and forward">
-      <button class="navbtn" id="navBack" type="button" aria-label="Back" title="Back" aria-disabled="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>
-      </button>
-      <button class="navbtn" id="navFwd" type="button" aria-label="Forward" title="Forward" aria-disabled="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
-      </button>
-    </nav>
-    <div class="titles">
-      <h1 id="title" tabindex="-1"><?= pageTitle ?></h1>
-      <div class="clock num" id="clock"></div>
-    </div>
-    <button class="homebtn" id="navHome" type="button" aria-label="Home" title="Home">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+<header class="appbar">
+  <div class="appbar-in">
+    <button class="iconbtn" id="navBack" type="button" aria-label="Back" title="Back" aria-disabled="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>
     </button>
-  </header>
+    <button class="iconbtn" id="navFwd" type="button" aria-label="Forward" title="Forward" aria-disabled="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <h1 class="brand">
+      <button class="brand-btn" id="brandHome" type="button" title="Go to the first screen" aria-describedby="homeHint">
+        <img class="logo" src="data:image/png;base64,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" width="34" height="34" alt="">
+        <span class="brand-text"><span class="app-name"><?= pageTitle ?></span> <span class="store">Hanaromart</span></span>
+      </button>
+    </h1>
+    <span class="sr" id="homeHint">Goes to the first screen</span>
+    <button class="iconbtn" id="navHome" type="button" aria-label="Home" title="Home">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+  </div>
+</header>
 
-  <!-- COUNT VIEW -->
-  <main id="countView" class="stack">
+<div class="wrap">
+  <!-- COUNT VIEW (the first screen) -->
+  <main id="countView" class="stack" tabindex="-1">
     <div class="saved" id="savedBox" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
       <div><b id="savedTitle"></b><span id="savedTime" class="num"></span></div>
     </div>
 
-    <section class="counter">
+    <section class="card counter">
       <div class="c-head">
         <label class="c-name" for="qty"><span id="productName">Wagyu</span><span class="sr"> count</span></label>
-        <span class="c-each num" id="each"></span>
+        <span class="chip num" id="each"></span>
       </div>
       <div class="stepper">
         <button class="stepbtn" id="minus" type="button" aria-label="One less" aria-controls="qty">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg>
         </button>
         <input class="qty num" id="qty" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="next" aria-describedby="kgLine countErr">
-        <button class="stepbtn" id="plus" type="button" aria-label="One more" aria-controls="qty">
+        <button class="stepbtn plus" id="plus" type="button" aria-label="One more" aria-controls="qty">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </div>
@@ -221,7 +272,7 @@
       </p>
     </section>
 
-    <section class="fields">
+    <section class="card fields">
       <div class="field-wrap">
         <label class="lab" for="name">Your name</label>
         <input class="field" id="name" maxlength="40" autocomplete="given-name" autocapitalize="words" spellcheck="false" placeholder="First name" enterkeyhint="next" aria-describedby="nameErr">
@@ -236,20 +287,20 @@
     </section>
 
     <button class="primary" id="save" type="button">Save</button>
-    <p class="hint">Date and time are stamped by the system when you tap Save.</p>
+    <p class="hint">Saved with the system time · now <span class="num" id="clock"></span></p>
     <button class="linkbtn" id="toManager" type="button">Manager</button>
   </main>
 
   <!-- MANAGER VIEW -->
-  <main id="mgrView" class="stack" hidden>
+  <main id="mgrView" class="stack" tabindex="-1" hidden>
     <div class="mgr-head">
       <h2 id="mgrTitle" tabindex="-1">Manager</h2>
-      <button class="ghost" id="refresh" type="button" hidden>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg><span class="lbl">Refresh</span>
+      <button class="secondary" id="refresh" type="button" hidden>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg><span>Refresh</span>
       </button>
     </div>
 
-    <section class="card" id="pinCard">
+    <section class="card stack" id="pinCard">
       <label class="lab" for="pin">Manager PIN</label>
       <div class="pinrow">
         <input class="field" id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" enterkeyhint="go" aria-describedby="pinErr">
@@ -263,8 +314,33 @@
     <section id="mgrBody" class="stack" hidden>
       <div class="totals" id="totals"></div>
       <div class="stack" id="entries"></div>
+      <section class="card danger" aria-labelledby="dangerTitle">
+        <h3 id="dangerTitle">Reset all data</h3>
+        <p class="muted">Deletes every count in the Log sheet so you can start again. Settings and the PIN stay.</p>
+        <button class="danger-outline" id="resetBtn" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Reset all data
+        </button>
+      </section>
     </section>
   </main>
+</div>
+
+<!-- RESET CONFIRMATION -->
+<div class="scrim" id="resetDlg" hidden>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="rdTitle" aria-describedby="rdBody">
+    <div class="dlg-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+    </div>
+    <h2 id="rdTitle">Are you sure you want to reset all data?</h2>
+    <p id="rdBody"></p>
+    <p class="field-err" id="rdErr" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
+    </p>
+    <div class="dlg-actions">
+      <button class="secondary" id="rdCancel" type="button">Cancel</button>
+      <button class="danger-btn" id="rdConfirm" type="button">Yes, reset</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast" aria-hidden="true"></div>
@@ -294,9 +370,10 @@
   try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
   /* ---------- clock (Brisbane) ---------- */
-  var clockFmt = null;
-  try { clockFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); } catch (e) {}
-  function tick() { $('clock').textContent = clockFmt ? clockFmt.format(new Date()) : new Date().toLocaleTimeString(); }
+  var timeFmt = null;
+  try { timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); } catch (e) {}
+  function nowText() { return timeFmt ? timeFmt.format(new Date()) : new Date().toLocaleTimeString(); }
+  function tick() { $('clock').textContent = nowText(); }
   tick(); setInterval(tick, 1000);
 
   /* ---------- helpers ---------- */
@@ -306,6 +383,7 @@
   function money(n) { return (n < 0 ? '−$' : n > 0 ? '+$' : '$') + Math.abs(n).toFixed(2); }
   function signed(n) { return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0'; }
   function units(n) { return n + (n === 1 ? ' unit' : ' units'); }
+  function counts(n) { return n + (n === 1 ? ' count' : ' counts'); }
   function errText(e) {
     var m = e && e.message ? String(e.message) : String(e || '');
     m = m.replace(/^(Exception|Error):\s*/i, '');
@@ -340,6 +418,7 @@
     $(boxId).hidden = true;
     if (input) input.removeAttribute('aria-invalid');
   }
+  function focusQuiet(el) { try { el.focus({ preventScroll: true }); } catch (e) {} }
 
   /* ---------- count view ---------- */
   var qty = $('qty'), nameEl = $('name'), noteEl = $('note'), saveBtn = $('save');
@@ -347,6 +426,7 @@
 
   $('productName').textContent = PRODUCT;
   $('each').textContent = AVG ? '~' + weight(AVG) + ' each' : '';
+  $('each').hidden = !AVG;
 
   function sync() {
     if (document.activeElement !== qty) qty.value = count == null ? '' : String(count);
@@ -439,9 +519,7 @@
   sync();
 
   /* ---------- manager view ---------- */
-  var mgr = { pin: null, rows: [], loadedAt: '' };
-  var timeFmt = null;
-  try { timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); } catch (e) {}
+  var mgr = { pin: null, rows: [], total: 0, loadedAt: '' };
   var dayFmt = null, ymdFmt = null;
   try { dayFmt = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) {}
   try { ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }); } catch (e) {}
@@ -473,10 +551,9 @@
   }
 
   /* ---------- pages: Home, Back, Forward ---------- */
-  // A small in-page history, like a browser's: Back and Forward walk the screens you opened,
-  // Home opens the count screen (the first screen).
+  // A small in-page history, like a browser's: Back and Forward walk the screens you opened;
+  // Home, the logo and the title all open the count screen (the first screen).
   var nav = { stack: ['count'], i: 0 };
-  function focusQuiet(el) { try { el.focus({ preventScroll: true }); } catch (e) {} }
   function updateNav() {
     $('navBack').setAttribute('aria-disabled', String(nav.i === 0));
     $('navFwd').setAttribute('aria-disabled', String(nav.i >= nav.stack.length - 1));
@@ -486,13 +563,13 @@
     $('countView').hidden = toMgr; $('mgrView').hidden = !toMgr;
     window.scrollTo(0, 0);
     updateNav();
-    if (!toMgr) { focusQuiet($('title')); return; }
+    if (!toMgr) { focusQuiet($('countView')); return; }
     var pin = mgr.pin || sess.get(PIN_KEY);
     if (pin) { load(pin); focusQuiet($('mgrTitle')); }
     else setTimeout(function () { $('pin').focus(); }, 50);
   }
   function go(view) {
-    if (view === nav.stack[nav.i]) { window.scrollTo(0, 0); return; }
+    if (view === nav.stack[nav.i]) { try { window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, 0); } return; }
     nav.stack = nav.stack.slice(0, nav.i + 1).concat(view).slice(-30);
     nav.i = nav.stack.length - 1;
     render(view);
@@ -506,6 +583,7 @@
   $('navBack').addEventListener('click', function () { step(-1); });
   $('navFwd').addEventListener('click', function () { step(1); });
   $('navHome').addEventListener('click', function () { go('count'); });
+  $('brandHome').addEventListener('click', function () { go('count'); });
   $('toManager').addEventListener('click', function () { go('mgr'); });
   updateNav();
 
@@ -526,7 +604,8 @@
       setLoading(false);
       mgr.pin = pin; sess.set(PIN_KEY, pin); $('pin').value = '';
       mgr.rows = (res && res.rows) || [];
-      mgr.loadedAt = timeFmt ? timeFmt.format(new Date()) : '';
+      mgr.total = res && res.total != null ? res.total : mgr.rows.length;
+      mgr.loadedAt = nowText();
       $('pinCard').hidden = true; $('mgrBody').hidden = false; $('refresh').hidden = false;
       renderEntries();
       if (refreshing) say('live', 'Updated');
@@ -575,7 +654,7 @@
     tile('Short (units)', short ? signed(short) : '0', short < 0);
     if (hasCost) tile('Short ($)', money(cost), cost < 0);
     else tile('Short (kg)', k ? '−' + kg(Math.abs(k)) : '0 kg', k < 0);
-    t.appendChild(mk('p', 'muted num', rows.length + (rows.length === 1 ? ' count' : ' counts') + ' · ' + waiting + ' waiting for a stock figure' + (mgr.loadedAt ? ' · updated ' + mgr.loadedAt : '')));
+    t.appendChild(mk('p', 'muted num', counts(rows.length) + ' · ' + waiting + ' waiting for a stock figure' + (mgr.loadedAt ? ' · updated ' + mgr.loadedAt : '')));
   }
 
   function renderEntries() {
@@ -619,7 +698,7 @@
     inp.autocomplete = 'off'; inp.setAttribute('enterkeyhint', 'done');
     inp.value = r.stock == null ? '' : String(r.stock);
     var lab = mk('label', null, 'Manager stock'); lab.htmlFor = inp.id;
-    var btn = mk('button', 'ghost', 'Save'); btn.type = 'button';
+    var btn = mk('button', 'secondary', 'Save'); btn.type = 'button';
     btn.setAttribute('aria-label', 'Save manager stock for the ' + r.at.slice(11) + ' count');
     st.appendChild(lab); st.appendChild(inp); st.appendChild(btn); st.appendChild(pill(r));
     c.appendChild(st);
@@ -645,6 +724,57 @@
     });
     return c;
   }
+
+  /* ---------- reset all data (asks first) ---------- */
+  var dlg = $('resetDlg'), lastFocus = null, resetting = false;
+  function setResetting(on) {
+    resetting = on;
+    $('rdConfirm').disabled = on; $('rdCancel').disabled = on;
+    $('rdConfirm').textContent = on ? 'Resetting…' : 'Yes, reset';
+  }
+  function openReset() {
+    lastFocus = document.activeElement;
+    var n = mgr.total;
+    $('rdBody').textContent = (n ? 'All ' + counts(n) : 'Every count') + ' in the Log sheet will be deleted for good. Settings and the PIN stay.';
+    clearErr('rdErr');
+    dlg.hidden = false;
+    document.body.classList.add('modal-open');
+    $('rdCancel').focus();
+  }
+  function closeReset() {
+    if (resetting) return;
+    dlg.hidden = true;
+    document.body.classList.remove('modal-open');
+    if (lastFocus && document.body.contains(lastFocus)) focusQuiet(lastFocus);
+  }
+  $('resetBtn').addEventListener('click', openReset);
+  $('rdCancel').addEventListener('click', closeReset);
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) closeReset(); });
+  dlg.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeReset(); return; }
+    if (e.key !== 'Tab') return;
+    var a = $('rdCancel'), b = $('rdConfirm');
+    if (e.shiftKey && document.activeElement === a) { e.preventDefault(); b.focus(); }
+    else if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); a.focus(); }
+  });
+  $('rdConfirm').addEventListener('click', function () {
+    if (resetting) return;
+    clearErr('rdErr');
+    setResetting(true);
+    call('resetAll', [mgr.pin], function (res) {
+      setResetting(false);
+      var n = res && res.cleared != null ? res.cleared : mgr.total;
+      mgr.rows = []; mgr.total = 0; mgr.loadedAt = nowText();
+      closeReset();
+      renderEntries();
+      toast('All data reset · ' + counts(n) + ' deleted');
+    }, function (err) {
+      setResetting(false);
+      var msg = errText(err);
+      showErr('rdErr', null, msg);
+      say('alert', msg);
+    });
+  });
 })();
 </script>
 </body>
