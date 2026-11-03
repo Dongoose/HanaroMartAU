@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><?= pageTitle ?></title>
+<style>
+  /* One narrow column: the Wagyu counter is the hero, name and note sit under it, Save closes the form. */
+  :root {
+    --bg: #f5f1ed; --card: #ffffff; --ink: #1f1a18; --muted: #675d56; --line: #e4dbd3; --line-strong: #948780;
+    --accent: #8c2a20; --accent-press: #73221a; --accent-ink: #ffffff; --soft: #f6e8e4;
+    --neg: #a8231a; --neg-bg: #fde4e1; --pos: #1d6b45; --pos-bg: #e1f3e8; --warn: #7a4f00; --warn-bg: #fbefd5;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141110; --card: #1e1a19; --ink: #f2ece8; --muted: #ab9f98; --line: #352f2c; --line-strong: #766a64;
+      --accent: #e0675a; --accent-press: #c9584b; --accent-ink: #1a0f0d; --soft: #2d201e;
+      --neg: #ff8a7d; --neg-bg: #3a1c18; --pos: #7fd4a4; --pos-bg: #15291f; --warn: #f0c060; --warn-bg: #2e2412;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  button:disabled { cursor: default; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  svg { display: block; flex: none; }
+  .num { font-variant-numeric: tabular-nums; }
+  .sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; padding: 0; }
+
+  .wrap {
+    max-width: 520px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); flex: none; position: relative; }
+  .mark::after { content: ""; position: absolute; inset: 9px 7px; border: 2.5px solid var(--accent-ink); border-radius: 50% 50% 45% 55%; opacity: .9; }
+  h1 { font-size: 18px; line-height: 1.25; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  h1:focus, h2:focus { outline: none; }
+  .clock { font-size: 14px; color: var(--muted); white-space: nowrap; }
+
+  /* success after save */
+  .saved { display: flex; gap: 10px; align-items: flex-start; background: var(--pos-bg); color: var(--pos); border-radius: 14px; padding: 12px 14px; }
+  .saved b { display: block; font-size: 16px; }
+  .saved span { font-size: 14px; }
+  .saved svg { margin-top: 1px; }
+
+  /* the counter */
+  .counter { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 16px 14px; }
+  .c-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .c-name { font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .c-each { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .stepper { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 10px; align-items: center; margin: 14px 0 10px; }
+  .stepbtn {
+    height: 64px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--bg);
+    display: grid; place-items: center; color: var(--ink); transition: background-color .15s ease-out;
+  }
+  .stepbtn:active:not([aria-disabled="true"]) { background: var(--line); }
+  .stepbtn[aria-disabled="true"] { opacity: .4; cursor: default; }
+  .qty {
+    width: 100%; height: 64px; text-align: center; font-size: 40px; font-weight: 700; letter-spacing: -.01em;
+    border: 1.5px solid var(--line-strong); border-radius: 14px; background: var(--card); outline: none;
+    font-variant-numeric: tabular-nums; padding: 0 4px;
+  }
+  .kg-line { margin: 0; text-align: center; font-size: 15px; color: var(--muted); min-height: 22px; }
+
+  /* name and note */
+  .fields { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .field-wrap { display: flex; flex-direction: column; gap: 6px; }
+  label.lab { font-size: 14px; font-weight: 600; }
+  .opt { font-weight: 400; color: var(--muted); }
+  input.field {
+    width: 100%; height: 48px; border: 1px solid var(--line-strong); border-radius: 10px;
+    background: var(--bg); padding: 0 12px; font-size: 16px; outline: none;
+  }
+  input.field:focus, .qty:focus, .stock-in:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--soft); }
+  [aria-invalid="true"] { border-color: var(--neg) !important; }
+  .nudge { animation: nudge .3s; }
+  @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .field-err { margin: 0; display: flex; gap: 6px; align-items: flex-start; color: var(--neg); font-size: 14px; font-weight: 500; }
+  .field-err svg { margin-top: 1px; }
+  .counter .field-err { justify-content: center; margin-top: 6px; }
+
+  .primary {
+    width: 100%; height: 56px; border: 0; border-radius: 14px; background: var(--accent); color: var(--accent-ink);
+    font-weight: 700; font-size: 17px; transition: background-color .15s ease-out;
+  }
+  .primary:active:not(:disabled) { background: var(--accent-press); }
+  .primary:disabled { opacity: .6; }
+  .hint { margin: 0; font-size: 14px; color: var(--muted); text-align: center; }
+  .linkbtn {
+    align-self: center; min-height: 44px; padding: 0 14px; background: none; border: 0; color: var(--muted);
+    font-size: 15px; text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  .toast {
+    position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 10;
+    transform: translate(-50%, calc(-100% - 24px)); visibility: hidden;
+    transition: transform .2s ease-out, visibility 0s .2s;
+    width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px;
+    background: var(--ink); color: var(--bg); font-size: 15px; text-align: center;
+  }
+  .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .2s ease-out; }
+  .toast.err { background: var(--neg); color: var(--card); }
+
+  /* manager */
+  .mgr-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  .mgr-head h2 { font-size: 17px; margin: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #refresh[aria-busy="true"] svg { animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 359px) {
+    #refresh { padding: 0 12px; }
+    #refresh .lbl { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  }
+  .ghost {
+    min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--card);
+    font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; justify-self: start;
+  }
+  .ghost:active:not(:disabled) { background: var(--line); }
+  .ghost:disabled { opacity: .6; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .pinrow { display: flex; gap: 8px; }
+  .pinrow .field { flex: 1; min-width: 0; }
+  .pinrow .primary { width: auto; min-width: 104px; height: 48px; padding: 0 16px; font-size: 16px; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0; }
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tot { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .tot .k { font-size: 13px; color: var(--muted); }
+  .tot .v { font-size: 22px; font-weight: 700; }
+  .tot.bad .v { color: var(--neg); }
+  .totals .muted { grid-column: 1 / -1; }
+  .day { margin: 8px 2px 0; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .entry { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .e-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .e-time { font-size: 18px; font-weight: 700; }
+  .e-by { font-size: 14px; color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+  .e-line { margin: 0; font-size: 15px; }
+  .e-line .muted { font-size: 15px; }
+  .e-cctv { margin: 0; font-size: 14px; color: var(--muted); }
+  .e-note { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; overflow-wrap: anywhere; }
+  .chg-neg { color: var(--neg); font-weight: 600; }
+  .chg-pos { color: var(--pos); font-weight: 600; }
+  .e-stock { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .e-stock label { font-size: 14px; color: var(--muted); }
+  .stock-in {
+    width: 72px; height: 44px; text-align: center; font-size: 18px; font-weight: 700; border: 1px solid var(--line-strong);
+    border-radius: 10px; background: var(--bg); outline: none; font-variant-numeric: tabular-nums;
+  }
+  .pill { font-size: 13px; padding: 5px 10px; border-radius: 999px; font-weight: 600; }
+  .pill.neg { background: var(--neg-bg); color: var(--neg); }
+  .pill.pos { background: var(--warn-bg); color: var(--warn); }
+  .pill.ok { background: var(--pos-bg); color: var(--pos); }
+  .pill.wait { background: var(--bg); color: var(--muted); font-weight: 500; }
+  .empty { margin: 0; padding: 18px 14px; color: var(--muted); background: var(--card); border: 1px dashed var(--line-strong); border-radius: 16px; text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><h1 id="title" tabindex="-1"><?= pageTitle ?></h1></div>
+    <div class="clock num" id="clock"></div>
+  </header>
+
+  <!-- COUNT VIEW -->
+  <main id="countView" class="stack">
+    <div class="saved" id="savedBox" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b id="savedTitle"></b><span id="savedTime" class="num"></span></div>
+    </div>
+
+    <section class="counter">
+      <div class="c-head">
+        <label class="c-name" for="qty"><span id="productName">Wagyu</span><span class="sr"> count</span></label>
+        <span class="c-each num" id="each"></span>
+      </div>
+      <div class="stepper">
+        <button class="stepbtn" id="minus" type="button" aria-label="One less" aria-controls="qty">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg>
+        </button>
+        <input class="qty num" id="qty" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="next" aria-describedby="kgLine countErr">
+        <button class="stepbtn" id="plus" type="button" aria-label="One more" aria-controls="qty">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <p class="kg-line num" id="kgLine" aria-live="polite"></p>
+      <p class="field-err" id="countErr" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
+      </p>
+    </section>
+
+    <section class="fields">
+      <div class="field-wrap">
+        <label class="lab" for="name">Your name</label>
+        <input class="field" id="name" maxlength="40" autocomplete="given-name" autocapitalize="words" spellcheck="false" placeholder="First name" enterkeyhint="next" aria-describedby="nameErr">
+        <p class="field-err" id="nameErr" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
+        </p>
+      </div>
+      <div class="field-wrap">
+        <label class="lab" for="note">Note <span class="opt">(optional)</span></label>
+        <input class="field" id="note" maxlength="200" placeholder="e.g. put out 6 from the cool room" enterkeyhint="done">
+      </div>
+    </section>
+
+    <button class="primary" id="save" type="button">Save</button>
+    <p class="hint">Date and time are stamped by the system when you tap Save.</p>
+    <button class="linkbtn" id="toManager" type="button">Manager</button>
+  </main>
+
+  <!-- MANAGER VIEW -->
+  <main id="mgrView" class="stack" hidden>
+    <div class="mgr-head">
+      <button class="ghost" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>Count
+      </button>
+      <h2 id="mgrTitle" tabindex="-1">Manager</h2>
+      <button class="ghost" id="refresh" type="button" hidden>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg><span class="lbl">Refresh</span>
+      </button>
+    </div>
+
+    <section class="card" id="pinCard">
+      <label class="lab" for="pin">Manager PIN</label>
+      <div class="pinrow">
+        <input class="field" id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" enterkeyhint="go" aria-describedby="pinErr">
+        <button class="primary" id="unlock" type="button">Open</button>
+      </div>
+      <p class="field-err" id="pinErr" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
+      </p>
+    </section>
+
+    <section id="mgrBody" class="stack" hidden>
+      <div class="totals" id="totals"></div>
+      <div class="stack" id="entries"></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" aria-hidden="true"></div>
+<div class="sr" id="live" role="status" aria-live="polite"></div>
+<div class="sr" id="alert" role="alert"></div>
+
+<script>
+(function () {
+  'use strict';
+  var CONFIG = <?!= configJson ?>;
+  var TZ = 'Australia/Brisbane';
+  var PRODUCT = String(CONFIG.product || 'Wagyu');
+  var AVG = Number(CONFIG.avgKg) > 0 ? Number(CONFIG.avgKg) : 0;
+  var DRAFT_KEY = 'wagyu.draft', NAME_KEY = 'stock.name', PIN_KEY = 'stock.pin';
+
+  function $(id) { return document.getElementById(id); }
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function store(name) {
+    return {
+      get: function (k) { try { return window[name].getItem(k); } catch (e) { return null; } },
+      set: function (k, v) { try { window[name].setItem(k, v); } catch (e) {} },
+      del: function (k) { try { window[name].removeItem(k); } catch (e) {} }
+    };
+  }
+  var local = store('localStorage'), sess = store('sessionStorage');
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  /* ---------- clock (Brisbane) ---------- */
+  var clockFmt = null;
+  try { clockFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); } catch (e) {}
+  function tick() { $('clock').textContent = clockFmt ? clockFmt.format(new Date()) : new Date().toLocaleTimeString(); }
+  tick(); setInterval(tick, 1000);
+
+  /* ---------- helpers ---------- */
+  // Round to grams first (like the sheet's ROUND(…, 3)) so 0.285 shows as 0.29, not 0.28.
+  function kg(n) { return (Math.round(Math.round(n * 1000) / 10) / 100).toFixed(2) + ' kg'; }
+  function weight(k) { return k < 1 ? Math.round(k * 1000) + ' g' : (Math.round(k * 100) / 100) + ' kg'; }
+  function money(n) { return (n < 0 ? '−$' : n > 0 ? '+$' : '$') + Math.abs(n).toFixed(2); }
+  function signed(n) { return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0'; }
+  function units(n) { return n + (n === 1 ? ' unit' : ' units'); }
+  function errText(e) {
+    var m = e && e.message ? String(e.message) : String(e || '');
+    m = m.replace(/^(Exception|Error):\s*/i, '');
+    if (!m || /network|failed to fetch|timeout|NetworkError/i.test(m)) m = 'No connection. Check the signal and try again.';
+    return m;
+  }
+  function say(regionId, msg) { var r = $(regionId); r.textContent = ''; setTimeout(function () { r.textContent = msg; }, 40); }
+  var toastTimer;
+  function toast(msg, isErr) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    say(isErr ? 'alert' : 'live', msg);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = 'toast' + (isErr ? ' err' : ''); }, isErr ? 5000 : 2600);
+  }
+  function call(fn, args, ok, fail) {
+    if (!window.google || !google.script || !google.script.run) { fail(new Error('Open this page from the web app link.')); return; }
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(fail);
+    r[fn].apply(r, args);
+  }
+  function showErr(boxId, input, msg) {
+    var box = $(boxId);
+    box.lastElementChild.textContent = msg;
+    box.hidden = false;
+    if (input) {
+      input.setAttribute('aria-invalid', 'true');
+      if (!reduceMotion) { input.classList.remove('nudge'); void input.offsetWidth; input.classList.add('nudge'); }
+    }
+  }
+  function clearErr(boxId, input) {
+    $(boxId).hidden = true;
+    if (input) input.removeAttribute('aria-invalid');
+  }
+
+  /* ---------- count view ---------- */
+  var qty = $('qty'), nameEl = $('name'), noteEl = $('note'), saveBtn = $('save');
+  var count = null, busy = false;
+
+  $('productName').textContent = PRODUCT;
+  $('each').textContent = AVG ? '~' + weight(AVG) + ' each' : '';
+
+  function sync() {
+    if (document.activeElement !== qty) qty.value = count == null ? '' : String(count);
+    // aria-disabled (not disabled) so a keyboard user's focus stays on the button at 0
+    $('minus').setAttribute('aria-disabled', String(busy || !count));
+    $('plus').setAttribute('aria-disabled', String(busy || count === 9999));
+    var line = $('kgLine'), text = count == null ? 'Tap + or type the number you counted.' : (AVG ? '≈ ' + kg(count * AVG) : units(count));
+    if (line.getAttribute('data-t') !== text) {
+      line.setAttribute('data-t', text);
+      line.textContent = '';
+      if (count != null && AVG) line.appendChild(mk('span', 'sr', units(count) + ', '));
+      line.appendChild(document.createTextNode(text));
+    }
+    saveBtn.textContent = busy ? 'Saving…' : count == null ? 'Save' : 'Save ' + units(count);
+    saveBtn.disabled = busy;
+    saveBtn.setAttribute('aria-busy', String(busy));
+    qty.readOnly = nameEl.readOnly = noteEl.readOnly = busy;
+  }
+
+  function saveDraft() {
+    if (count == null && !noteEl.value) { local.del(DRAFT_KEY); return; }
+    local.set(DRAFT_KEY, JSON.stringify({ t: Date.now(), count: count, note: noteEl.value }));
+  }
+
+  function setCount(v) {
+    count = v == null || isNaN(v) ? null : Math.max(0, Math.min(9999, v));
+    clearErr('countErr', qty);
+    $('savedBox').hidden = true;
+    saveDraft();
+    sync();
+  }
+
+  $('plus').addEventListener('click', function () { if (!busy && count !== 9999) setCount(count == null ? 1 : count + 1); });
+  $('minus').addEventListener('click', function () { if (!busy && count) setCount(count - 1); });
+  qty.addEventListener('focus', function () { qty.setAttribute('enterkeyhint', nameEl.value.trim() ? 'done' : 'next'); });
+  qty.addEventListener('input', function () {
+    var clean = qty.value.replace(/\D/g, '').slice(0, 4);
+    if (clean !== qty.value) qty.value = clean;
+    setCount(clean === '' ? null : parseInt(clean, 10));
+  });
+  qty.addEventListener('blur', sync);
+  qty.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!nameEl.value.trim()) nameEl.focus(); else qty.blur();
+  });
+  nameEl.addEventListener('input', function () { clearErr('nameErr', nameEl); });
+  nameEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); noteEl.focus(); } });
+  noteEl.addEventListener('input', function () { $('savedBox').hidden = true; saveDraft(); });
+  noteEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); noteEl.blur(); } });
+
+  function save() {
+    if (busy) return;
+    var name = nameEl.value.trim(), first = null;
+    if (count == null) { showErr('countErr', qty, 'Enter how many ' + PRODUCT + ' you counted.'); first = qty; }
+    if (!name) { showErr('nameErr', nameEl, 'Enter your name so the manager knows who counted.'); first = first || nameEl; }
+    if (first) { first.focus(); return; }
+    local.set(NAME_KEY, name);
+    var sent = count;
+    busy = true; sync();
+    call('submitCount', [{ by: name, count: sent, note: noteEl.value }], function (res) {
+      var n = res && res.count != null ? res.count : sent;
+      busy = false;
+      count = null; noteEl.value = ''; local.del(DRAFT_KEY);
+      sync();
+      $('savedTitle').textContent = 'Saved: ' + n + ' ' + PRODUCT;
+      $('savedTime').textContent = res && res.at ? res.at : '';
+      $('savedBox').hidden = false;
+      say('live', 'Saved ' + units(n) + ' of ' + PRODUCT + (res && res.at ? ' at ' + res.at : ''));
+      try { window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+      if (navigator.vibrate) { try { navigator.vibrate(25); } catch (e) {} }
+    }, function (err) {
+      busy = false; sync();
+      toast(errText(err) + ' Your count is still here.', true);
+    });
+  }
+  saveBtn.addEventListener('click', save);
+
+  /* ---------- restore ---------- */
+  nameEl.value = local.get(NAME_KEY) || '';
+  (function restoreDraft() {
+    var raw = local.get(DRAFT_KEY); if (!raw) return;
+    try {
+      var d = JSON.parse(raw);
+      if (!d || !(Date.now() - d.t < 45 * 60 * 1000)) { local.del(DRAFT_KEY); return; }
+      if (typeof d.count === 'number' && d.count >= 0 && d.count <= 9999) count = Math.floor(d.count);
+      if (d.note) noteEl.value = String(d.note).slice(0, 200);
+    } catch (e) { local.del(DRAFT_KEY); }
+  })();
+  sync();
+
+  /* ---------- manager view ---------- */
+  var mgr = { pin: null, rows: [], loadedAt: '' };
+  var timeFmt = null;
+  try { timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); } catch (e) {}
+  var dayFmt = null, ymdFmt = null;
+  try { dayFmt = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) {}
+  try { ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }); } catch (e) {}
+
+  function ymd(date) {
+    if (!ymdFmt || !ymdFmt.formatToParts) return date.toISOString().slice(0, 10);
+    var p = {}; ymdFmt.formatToParts(date).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day;
+  }
+  function niceDay(d) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return d || 'No date';
+    var a = d.split('-'), dt = new Date(Date.UTC(+a[0], +a[1] - 1, +a[2], 12));
+    return dayFmt ? dayFmt.format(dt).replace(',', '') : d;
+  }
+  function dayLabel(d) {
+    var now = new Date();
+    if (d === ymd(now)) return 'Today · ' + niceDay(d);
+    if (d === ymd(new Date(now.getTime() - 864e5))) return 'Yesterday · ' + niceDay(d);
+    return niceDay(d);
+  }
+  function shortAt(s, day) { return s.slice(0, 10) === day ? s.slice(11) : niceDay(s.slice(0, 10)) + ' ' + s.slice(11); }
+
+  function showView(toMgr) {
+    $('countView').hidden = toMgr; $('mgrView').hidden = !toMgr;
+    window.scrollTo(0, 0);
+  }
+  function setLoading(on) {
+    $('unlock').disabled = on; $('refresh').disabled = on;
+    $('unlock').textContent = on ? 'Opening…' : 'Open';
+    $('refresh').lastElementChild.textContent = on ? 'Loading…' : 'Refresh';
+    $('refresh').setAttribute('aria-busy', String(on));
+    $('mgrBody').setAttribute('aria-busy', String(on));
+  }
+  $('toManager').addEventListener('click', function () {
+    showView(true);
+    var pin = mgr.pin || sess.get(PIN_KEY);
+    if (pin) { load(pin); try { $('mgrTitle').focus({ preventScroll: true }); } catch (e) {} }
+    else setTimeout(function () { $('pin').focus(); }, 50);
+  });
+  $('back').addEventListener('click', function () {
+    showView(false);
+    try { $('title').focus({ preventScroll: true }); } catch (e) {}
+  });
+  $('refresh').addEventListener('click', function () { if (mgr.pin) load(mgr.pin); });
+  $('unlock').addEventListener('click', function () {
+    var v = $('pin').value.trim();
+    if (!v) { showErr('pinErr', $('pin'), 'Enter the manager PIN.'); $('pin').focus(); return; }
+    load(v);
+  });
+  $('pin').addEventListener('input', function () { clearErr('pinErr', $('pin')); });
+  $('pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('unlock').click(); } });
+
+  function load(pin) {
+    var refreshing = !!mgr.pin;
+    clearErr('pinErr', $('pin'));
+    setLoading(true);
+    call('getRecent', [pin, 200], function (res) {
+      setLoading(false);
+      mgr.pin = pin; sess.set(PIN_KEY, pin); $('pin').value = '';
+      mgr.rows = (res && res.rows) || [];
+      mgr.loadedAt = timeFmt ? timeFmt.format(new Date()) : '';
+      $('pinCard').hidden = true; $('mgrBody').hidden = false; $('refresh').hidden = false;
+      renderEntries();
+      if (refreshing) say('live', 'Updated');
+    }, function (err) {
+      setLoading(false);
+      var msg = errText(err);
+      if (refreshing && !/PIN/i.test(msg)) { toast(msg, true); return; }
+      mgr.pin = null; sess.del(PIN_KEY);
+      $('mgrBody').hidden = true; $('refresh').hidden = true; $('pinCard').hidden = false;
+      showErr('pinErr', $('pin'), msg);
+      say('alert', msg);
+    });
+  }
+
+  function diffInfo(r) {
+    if (r.stock == null || r.count == null) return null;
+    var d = r.count - r.stock, k = d * (r.avgKg || 0);
+    return { units: d, kg: k, cost: r.price != null ? k * r.price : null };
+  }
+
+  function pill(r) {
+    var info = diffInfo(r), s = mk('span', 'pill');
+    if (!info) { s.className += ' wait'; s.textContent = 'Waiting for stock figure'; return s; }
+    if (info.units === 0) { s.className += ' ok'; s.textContent = 'Matches'; return s; }
+    var txt = (info.units < 0 ? 'Short ' : 'Over ') + signed(info.units);
+    if (r.avgKg) txt += ' · ' + (info.kg < 0 ? '−' : '+') + kg(Math.abs(info.kg));
+    if (info.cost != null) txt += ' · ' + money(info.cost);
+    s.className += info.units < 0 ? ' neg' : ' pos';
+    s.textContent = txt;
+    return s;
+  }
+
+  function renderTotals() {
+    var rows = mgr.rows, short = 0, k = 0, cost = 0, hasCost = false, waiting = 0;
+    rows.forEach(function (r) {
+      var i = diffInfo(r);
+      if (!i) { waiting++; return; }
+      if (i.units < 0) { short += i.units; k += i.kg; if (i.cost != null) { cost += i.cost; hasCost = true; } }
+    });
+    var t = $('totals'); t.textContent = '';
+    function tile(label, value, bad) {
+      var b = mk('div', 'tot' + (bad ? ' bad' : ''));
+      b.appendChild(mk('div', 'k', label)); b.appendChild(mk('div', 'v num', value));
+      t.appendChild(b);
+    }
+    tile('Short (units)', short ? signed(short) : '0', short < 0);
+    if (hasCost) tile('Short ($)', money(cost), cost < 0);
+    else tile('Short (kg)', k ? '−' + kg(Math.abs(k)) : '0 kg', k < 0);
+    t.appendChild(mk('p', 'muted num', rows.length + (rows.length === 1 ? ' count' : ' counts') + ' · ' + waiting + ' waiting for a stock figure' + (mgr.loadedAt ? ' · updated ' + mgr.loadedAt : '')));
+  }
+
+  function renderEntries() {
+    renderTotals();
+    var box = $('entries'); box.textContent = '';
+    if (!mgr.rows.length) { box.appendChild(mk('p', 'empty', 'No counts yet. They show up here as soon as someone taps Save.')); return; }
+    var lastDay = null;
+    mgr.rows.forEach(function (r) {
+      var d = r.at.slice(0, 10);
+      if (d !== lastDay) { box.appendChild(mk('h3', 'day', dayLabel(d))); lastDay = d; }
+      box.appendChild(entryCard(r));
+    });
+  }
+
+  function entryCard(r) {
+    var day = r.at.slice(0, 10), c = mk('article', 'entry');
+    var top = mk('div', 'e-top');
+    top.appendChild(mk('span', 'e-time num', r.at.slice(11) || r.at));
+    top.appendChild(mk('span', 'e-by', r.by || '?'));
+    c.appendChild(top);
+
+    var line = mk('p', 'e-line');
+    line.appendChild(document.createTextNode('Counted '));
+    line.appendChild(mk('b', 'num', String(r.count)));
+    if (r.avgKg) line.appendChild(mk('span', 'muted num', ' (≈ ' + kg(r.count * r.avgKg) + ')'));
+    c.appendChild(line);
+
+    if (r.prevCount != null && r.prevAt) {
+      var ch = r.count - r.prevCount, l2 = mk('p', 'e-line');
+      l2.appendChild(document.createTextNode('Since last count '));
+      l2.appendChild(mk('span', ch < 0 ? 'chg-neg num' : ch > 0 ? 'chg-pos num' : 'num', signed(ch)));
+      l2.appendChild(mk('span', 'muted num', ' (was ' + r.prevCount + ')'));
+      c.appendChild(l2);
+      c.appendChild(mk('p', 'e-cctv num', 'CCTV window ' + shortAt(r.prevAt, day) + ' → ' + r.at.slice(11)));
+    }
+    if (r.note) c.appendChild(mk('p', 'e-note', r.note));
+
+    var st = mk('div', 'e-stock');
+    var inp = mk('input', 'stock-in num');
+    inp.id = 'stock-' + r.id; inp.type = 'text'; inp.inputMode = 'numeric'; inp.pattern = '[0-9]*'; inp.maxLength = 4;
+    inp.autocomplete = 'off'; inp.setAttribute('enterkeyhint', 'done');
+    inp.value = r.stock == null ? '' : String(r.stock);
+    var lab = mk('label', null, 'Manager stock'); lab.htmlFor = inp.id;
+    var btn = mk('button', 'ghost', 'Save'); btn.type = 'button';
+    btn.setAttribute('aria-label', 'Save manager stock for the ' + r.at.slice(11) + ' count');
+    st.appendChild(lab); st.appendChild(inp); st.appendChild(btn); st.appendChild(pill(r));
+    c.appendChild(st);
+
+    inp.addEventListener('input', function () {
+      var v = inp.value.replace(/\D/g, '').slice(0, 4); if (v !== inp.value) inp.value = v;
+      st.replaceChild(pill({ count: r.count, avgKg: r.avgKg, price: r.price, stock: v === '' ? null : parseInt(v, 10) }), st.lastChild);
+    });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); btn.click(); } });
+    btn.addEventListener('click', function () {
+      var v = inp.value.trim();
+      btn.disabled = true; btn.textContent = 'Saving…';
+      call('setStock', [mgr.pin, r.id, v === '' ? '' : parseInt(v, 10)], function (res) {
+        btn.disabled = false; btn.textContent = 'Save';
+        r.stock = res.stock === '' || res.stock == null ? null : res.stock;
+        st.replaceChild(pill(r), st.lastChild);
+        renderTotals();
+        toast(r.stock == null ? 'Stock figure cleared' : 'Saved stock for ' + r.at.slice(11));
+      }, function (err) {
+        btn.disabled = false; btn.textContent = 'Save';
+        toast(errText(err), true);
+      });
+    });
+    return c;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>와규 재고 체크 설치</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one reading column; the live phone preview sits beside the role summary on wide screens and stacks on phones */
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --ink: #1c1917; --muted: #6a6460; --line: #e5e1dd;
+    --accent: #8c2a20; --accent-soft: #f5e8e5; --code-bg: #f0efec; --ok: #1d6b45; --ok-soft: #e3f2e9; --on-fill: #ffffff;
+    --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151312; --surface: #1d1a19; --ink: #f0ebe7; --muted: #a39992; --line: #322d2a;
+      --accent: #e0675a; --accent-soft: #2c1d1a; --code-bg: #211e1c; --ok: #7fd4a4; --ok-soft: #15291f; --on-fill: #1a0f0d;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151312; --surface: #1d1a19; --ink: #f0ebe7; --muted: #a39992; --line: #322d2a;
+    --accent: #e0675a; --accent-soft: #2c1d1a; --code-bg: #211e1c; --ok: #7fd4a4; --ok-soft: #15291f; --on-fill: #1a0f0d;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15.5px/1.7 var(--font-body); word-break: keep-all; overflow-wrap: anywhere;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 64px;
+  }
+  .page { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.3; margin: 0; }
+  h1 { font-size: clamp(28px, 6vw, 38px); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; font-weight: 700; }
+  h3 { font-size: 16px; font-weight: 600; }
+  p { margin: 0; }
+  .eyebrow { font: 500 12px/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .muted { color: var(--muted); }
+  section { display: flex; flex-direction: column; gap: 16px; }
+  .sec-head { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 20px; }
+
+  header.hero { display: flex; flex-direction: column; gap: 12px; }
+  header.hero .lead { font-size: 17px; max-width: 62ch; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .fact { font: 500 13px/1 var(--font-mono); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+
+  /* preview + roles */
+  .split { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+  @media (min-width: 820px) { .split { grid-template-columns: 372px minmax(0, 1fr); gap: 36px; } }
+  .phone {
+    width: 100%; max-width: 372px; margin: 0 auto; border: 6px solid var(--ink); border-radius: 30px;
+    overflow: hidden; background: var(--bg); box-shadow: 0 12px 32px rgba(28, 25, 23, .14); position: relative;
+  }
+  .phone iframe { display: block; width: 100%; height: 700px; border: 0; background: var(--bg); }
+  .phone-msg { height: 700px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-size: 14px; }
+  .cap { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; }
+  .roles { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .role { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 14px; }
+  @media (max-width: 480px) { .role { grid-template-columns: 1fr; } }
+  .role .who { font: 600 12px/1.6 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding-top: 3px; }
+  .role ul { margin: 0; padding-left: 18px; }
+  .role li + li { margin-top: 2px; }
+  .formula { font: 500 14px/1.6 var(--font-mono); background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; }
+  .formula b { color: var(--accent); }
+
+  /* steps */
+  ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; counter-reset: s; }
+  ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 0 14px; padding: 16px 0; border-top: 1px solid var(--line); }
+  ol.steps > li:first-child { border-top: 0; padding-top: 4px; }
+  ol.steps > li::before {
+    content: counter(s); font: 600 14px/32px var(--font-mono); text-align: center;
+    width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent);
+  }
+  .step-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .step-body ul { margin: 0; padding-left: 18px; }
+  .path {
+    font: 500 13px/1.5 var(--font-mono); background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 5px; padding: 1px 6px; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  }
+  .note { font-size: 14px; color: var(--muted); }
+  .warn { font-size: 14px; background: var(--code-bg); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 0 6px 6px 0; }
+
+  /* code files */
+  .file { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+  .file-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
+  .file-name { font: 600 15px/1.3 var(--font-mono); }
+  .file-meta { font-size: 13px; color: var(--muted); flex: 1; min-width: 140px; }
+  .copy {
+    font: 600 14px/1 var(--font-body); height: 44px; padding: 0 16px; border-radius: 8px; border: 0;
+    background: var(--accent); color: var(--on-fill); cursor: pointer; min-width: 120px;
+  }
+  .copy:disabled { opacity: .5; cursor: default; }
+  .copy.done { background: var(--ok); }
+  .copy:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  details { border-top: 1px solid var(--line); }
+  summary { cursor: pointer; padding: 10px 14px; font-size: 14px; color: var(--muted); }
+  pre {
+    margin: 0; max-height: 460px; overflow: auto; background: var(--code-bg); padding: 14px;
+    font: 12.5px/1.55 var(--font-mono); tab-size: 2; white-space: pre; color: var(--ink);
+  }
+  .copy-hint { font-size: 13px; color: var(--accent); padding: 0 14px 12px; }
+
+  /* sheet tables */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-top: 1px solid var(--line); }
+  thead th { border-top: 0; font: 600 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); }
+  td.grp { font-weight: 600; white-space: nowrap; }
+  td .mono { font: 500 13px/1.6 var(--font-mono); }
+
+  ul.tips { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 70ch; }
+  footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 18px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <span class="eyebrow">정육 코너 로스 추적</span>
+    <h1>와규 재고 체크</h1>
+    <p class="lead">팀원이 Teams 링크를 눌러 로그인 없이 와규 개수를 입력하면, 구글 시트에 초 단위 시각과 대략적인 kg이 쌓여요. 매니저가 있어야 할 개수를 넣으면 차이와 CCTV 확인 구간이 바로 나와요.</p>
+    <div class="facts">
+      <span class="fact">설치 10분 정도</span>
+      <span class="fact">노트북에서 하기 추천</span>
+      <span class="fact">구글 계정만 있으면 무료</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-preview">
+    <div class="sec-head">
+      <span class="eyebrow">Preview</span>
+      <h2 id="h-preview">팀원 폰에 뜨는 화면</h2>
+    </div>
+    <div class="split">
+      <div>
+        <div class="phone">
+          <iframe id="preview" title="와규 입력 화면 미리보기" hidden></iframe>
+          <p class="phone-msg" id="previewMsg">미리보기를 불러오는 중…</p>
+        </div>
+        <p class="cap">아래 Index.html을 그대로 띄운 화면이에요. 저장, 매니저 화면(PIN 1234)까지 눌러볼 수 있고, 여기 입력한 건 저장되지 않아요. 기록은 예시예요.</p>
+      </div>
+      <div class="roles">
+        <div class="role">
+          <span class="who">팀원</span>
+          <ul>
+            <li>와규 개수 하나만 입력해요. 숫자를 치거나 +/−로 맞춘 뒤 저장.</li>
+            <li>이름은 한 번만 쓰면 그 폰에 기억돼요.</li>
+            <li>진열 보충, 입고, 폐기는 메모에 한 줄.</li>
+            <li>이전 개수는 안 보여줘요. 보고 따라 적는 걸 막으려고요.</li>
+          </ul>
+        </div>
+        <div class="role">
+          <span class="who">시트</span>
+          <ul>
+            <li>저장 시각은 폰이 아니라 서버 시계로 초까지 찍혀요 (브리즈번 시간).</li>
+            <li>개수 × 개당 평균 무게(기본 0.1425 kg)로 대략 kg 자동 계산.</li>
+            <li>직전 카운트의 개수와 시각을 찾아 변동을 붙여요.</li>
+          </ul>
+        </div>
+        <div class="role">
+          <span class="who">매니저</span>
+          <ul>
+            <li>같은 링크 하단 Manager → PIN 입력.</li>
+            <li>기록마다 있어야 할 개수(POS, 입고 기준)를 넣으면 차이가 개수, kg, $로 나와요.</li>
+            <li>상단에 부족분 합계, 아래는 날짜별 기록.</li>
+          </ul>
+        </div>
+        <p class="formula">차이 = 카운트 − 매니저 재고<br><b>−2</b> 이면 2개가 비는 것. CCTV는 <b>직전 카운트 시각 → 이번 카운트 시각</b> 사이를 보면 돼요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-setup">
+    <div class="sec-head">
+      <span class="eyebrow">Setup</span>
+      <h2 id="h-setup">설치 순서</h2>
+    </div>
+    <ol class="steps">
+      <li><div class="step-body">
+        <h3>새 구글 시트 만들기</h3>
+        <p>브라우저 주소창에 <span class="path">sheets.new</span> 입력. 이름은 "Wagyu Stock Check" 정도로.</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>Apps Script 열고 Code.gs 붙여넣기</h3>
+        <p>시트 메뉴 <span class="path">확장 프로그램 → Apps Script</span> (영어: Extensions → Apps Script). 열린 <span class="path">Code.gs</span> 안의 기존 내용을 지우고, 아래 <b>Code.gs 복사</b> 버튼으로 복사한 걸 붙여넣어요.</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>HTML 파일 "Index" 추가</h3>
+        <p>왼쪽 파일 목록의 <span class="path">+</span> → <span class="path">HTML</span>. 이름을 정확히 <span class="path">Index</span>로 (대문자 I, 확장자는 자동). 안의 내용을 지우고 <b>Index.html 복사</b>한 걸 붙여넣은 뒤 저장(Ctrl/Cmd + S).</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>setup 한 번 실행</h3>
+        <p>상단 함수 선택칸에서 <span class="path">setup</span> 고르고 <span class="path">실행</span>. 권한 창이 뜨면 본인 계정 선택 → <span class="path">고급</span> → <span class="path">(안전하지 않은 페이지)로 이동</span> → <span class="path">허용</span>.</p>
+        <p class="note">본인이 만든 스크립트라 구글이 "확인되지 않은 앱"이라고 띄우는 거예요. 시트에 Log, Settings 탭이 생기면 성공.</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>웹 앱으로 배포</h3>
+        <p><span class="path">배포 → 새 배포</span> → 유형 선택 톱니바퀴 → <span class="path">웹 앱</span>. 아래처럼 설정하고 배포.</p>
+        <ul>
+          <li>다음 사용자 인증 정보로 실행: <span class="path">나</span> (Execute as: Me)</li>
+          <li>액세스 권한이 있는 사용자: <span class="path">모든 사용자</span> (Who has access: Anyone)</li>
+        </ul>
+        <p class="warn">"Google 계정이 있는 모든 사용자"가 아니라 <b>"모든 사용자"</b>여야 팀원이 로그인 없이 들어와요.</p>
+        <p>나오는 <b>웹 앱 URL</b>(…/exec로 끝나는 주소)을 복사.</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>Settings 탭 정리</h3>
+        <ul>
+          <li><span class="path">Manager PIN</span>: 1234에서 꼭 바꾸기.</li>
+          <li><span class="path">Avg kg per unit</span>: 와규 한 개 평균 무게. 0.1425로 들어가 있어요.</li>
+          <li><span class="path">Price per kg</span>(선택): 넣으면 차이가 $로도 나와요.</li>
+        </ul>
+        <p class="note">시트에서 바꾼 건 재배포 없이 바로 반영돼요. 이미 저장된 줄은 저장 당시 무게와 가격을 그대로 유지해요.</p>
+      </div></li>
+      <li><div class="step-body">
+        <h3>Teams에 고정</h3>
+        <p>채널 상단 <span class="path">+</span> → 웹사이트 탭으로 URL 추가하거나, 게시물로 올리고 고정. 팀원은 누르기만 하면 돼요.</p>
+        <p class="note">처음 열면 맨 위에 "Google Apps Script 사용자가 만든 앱" 회색 문구가 보이는데 정상이에요.</p>
+      </div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-code">
+    <div class="sec-head">
+      <span class="eyebrow">Code</span>
+      <h2 id="h-code">붙여넣을 코드 두 개</h2>
+    </div>
+    <div class="file">
+      <div class="file-head">
+        <span class="file-name">Code.gs</span>
+        <span class="file-meta" data-meta>서버 쪽: 저장, 시각 기록, 차이 계산, PIN</span>
+        <button class="copy" type="button" id="copy-gs" data-target="src-gs" data-label="Code.gs 복사" disabled>불러오는 중…</button>
+      </div>
+      <p class="copy-hint" hidden></p>
+      <details><summary>코드 보기</summary><pre id="src-gs"></pre></details>
+    </div>
+    <div class="file">
+      <div class="file-head">
+        <span class="file-name">Index.html</span>
+        <span class="file-meta" data-meta>폰 화면: 와규 개수 입력, 매니저 화면</span>
+        <button class="copy" type="button" id="copy-html" data-target="src-html" data-label="Index.html 복사" disabled>불러오는 중…</button>
+      </div>
+      <p class="copy-hint" hidden></p>
+      <details><summary>코드 보기</summary><pre id="src-html"></pre></details>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-sheet">
+    <div class="sec-head">
+      <span class="eyebrow">Sheet</span>
+      <h2 id="h-sheet">시트에 쌓이는 것</h2>
+    </div>
+    <p class="muted">Log 탭에 저장 한 번에 한 줄씩. 차이가 마이너스인 칸은 빨갛게 표시돼요.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>구분</th><th>열</th><th>누가 채우나</th></tr></thead>
+        <tbody>
+          <tr><td class="grp">기록</td><td><span class="mono">Entry ID · Counted at · Counted by · Product · Count (units) · Avg kg / unit · Approx total kg · Note</span></td><td>팀원 입력 + 자동</td></tr>
+          <tr><td class="grp">비교</td><td><span class="mono">Previous count · Previous count at · Change (units)</span></td><td>자동</td></tr>
+          <tr><td class="grp">매니저</td><td><span class="mono">Manager stock (units) · Difference (units / kg / $) · Manager updated at</span></td><td>매니저 화면 또는 시트에 직접</td></tr>
+          <tr><td class="grp">Settings 탭</td><td><span class="mono">Manager PIN · Avg kg per unit · Price per kg · Page title</span></td><td>본인</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-tips">
+    <div class="sec-head">
+      <span class="eyebrow">Notes</span>
+      <h2 id="h-tips">운영하면서 알아둘 것</h2>
+    </div>
+    <ul class="tips">
+      <li>팀원은 링크로 입력만 할 수 있고 기존 기록을 고치거나 지울 수 없어요. 시트 자체는 본인과 매니저에게만 공유하세요.</li>
+      <li>폰 시계를 바꿔도 기록 시각은 서버 기준이라 영향이 없어요.</li>
+      <li>진열 보충이나 입고 직후 카운트는 메모가 있어야 변동이 설명돼요. 메모 없이 개수가 줄었는데 POS 판매량보다 많이 줄었다면 그 구간이 CCTV 후보예요.</li>
+      <li>매니저 PIN은 10번 틀리면 15분 잠겨요. 가벼운 잠금이라 PIN은 팀 채팅에 올리지 마세요.</li>
+      <li>코드를 고칠 일이 생기면 <span class="path">배포 → 배포 관리 → 연필 → 버전: 새 버전 → 배포</span>. 링크는 그대로 유지돼요.</li>
+      <li>예전 여러 품목 버전을 이미 설치했다면 두 파일을 이 코드로 바꾸고 setup을 한 번 더 실행한 뒤 새 버전으로 배포하세요. 기존 Log는 그대로 쓰고, Settings에 무게와 가격 줄이 추가돼요. Products 탭은 지워도 돼요.</li>
+      <li>지금은 와규 전용 화면이에요. Log에 Product 열을 남겨 둬서 나중에 품목을 늘려도 기존 기록을 그대로 쓸 수 있어요.</li>
+    </ul>
+  </section>
+
+  <footer>Code.gs, Index.html 두 파일이면 끝이에요. 같은 파일이 레포의 <span class="path">meat-stock/apps-script</span> 폴더에 있어요.</footer>
+</div>
+
+<script>
+(function () {
+  document.documentElement.lang = 'ko';
+  var SAMPLE = { title: 'Wagyu Stock Check', product: 'Wagyu', avgKg: 0.1425, price: 89.9, pin: '1234' };
+
+  /* ---------- load the two files (embedded copy first, then the files next to this page) ---------- */
+  function okText(res) { if (!res.ok) throw new Error(res.status + ' ' + res.statusText); return res.text(); }
+  function getSources() {
+    var emb = document.getElementById('embedded-src');
+    if (emb) {
+      try { var j = JSON.parse(emb.textContent); if (j && j.gs && j.html) return Promise.resolve(j); } catch (e) {}
+    }
+    if (!window.fetch) return Promise.reject(new Error('no fetch'));
+    return Promise.all([
+      fetch('apps-script/Code.gs', { cache: 'no-store' }).then(okText),
+      fetch('apps-script/Index.html', { cache: 'no-store' }).then(okText)
+    ]).then(function (a) { return { gs: a[0], html: a[1] }; });
+  }
+
+  /* ---------- preview-only stand-in for google.script.run (runs inside the phone frame, not part of the install) ---------- */
+  function previewBackend(S) {
+    var TZ = 'Australia/Brisbane';
+    function fmt(d) {
+      try {
+        var p = {};
+        new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+          .formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+        return p.year + '-' + p.month + '-' + p.day + ' ' + p.hour + ':' + p.minute + ':' + p.second;
+      } catch (e) { return d.toISOString().slice(0, 19).replace('T', ' '); }
+    }
+    var rows = [], seq = 0;
+    function add(minsAgo, by, count, note, stock) {
+      var d = new Date(Date.now() - minsAgo * 60000), prev = null;
+      rows.forEach(function (r) { if (r.atMs <= d.getTime() && (!prev || r.atMs >= prev.atMs)) prev = r; });
+      seq++;
+      rows.push({ id: 'demo-' + seq, n: seq, atMs: d.getTime(), at: fmt(d), by: by, count: count, avgKg: S.avgKg,
+        prevCount: prev ? prev.count : null, prevAt: prev ? prev.at : '', note: note || '',
+        stock: stock == null ? null : stock, price: S.price });
+    }
+    add(1560, 'Sam', 18, '', 18);
+    add(1290, 'Jess', 12, '', 13);
+    add(400, 'Jess', 14, '', 14);
+    add(260, 'Tom', 11, '', 12);
+    add(150, 'Priya', 15, 'put out 6 from the cool room', 17);
+    add(35, 'Tom', 12, '', null);
+
+    var API = {
+      submitCount: function (p) {
+        var by = String((p && p.by) || '').trim();
+        if (!by) throw new Error('Please enter your name.');
+        var n = Number(p.count);
+        if (!(n >= 0 && n <= 9999 && Math.floor(n) === n)) throw new Error('Check the count. Use a whole number from 0 to 9999.');
+        add(0, by, n, String(p.note || '').trim(), null);
+        return { ok: true, count: n, at: fmt(new Date()) };
+      },
+      getRecent: function (pin) {
+        if (String(pin).trim() !== S.pin) throw new Error('Wrong PIN. (The preview PIN is ' + S.pin + ')');
+        return { rows: rows.slice().sort(function (a, b) { return (b.atMs - a.atMs) || (b.n - a.n); }) };
+      },
+      setStock: function (pin, id, v) {
+        var r = rows.filter(function (x) { return x.id === id; })[0];
+        if (!r) throw new Error('Entry not found. Refresh the list.');
+        r.stock = v === '' ? null : v;
+        return { ok: true, id: id, stock: v, at: fmt(new Date()) };
+      }
+    };
+    function Runner(ok, fail) { this._ok = ok; this._fail = fail; }
+    Runner.prototype.withSuccessHandler = function (f) { return new Runner(f, this._fail); };
+    Runner.prototype.withFailureHandler = function (f) { return new Runner(this._ok, f); };
+    Object.keys(API).forEach(function (name) {
+      Runner.prototype[name] = function () {
+        var args = arguments, self = this;
+        setTimeout(function () {
+          var res;
+          try { res = JSON.parse(JSON.stringify(API[name].apply(null, args))); }
+          catch (e) { if (self._fail) self._fail(e); return; }
+          if (self._ok) self._ok(res);
+        }, 450);
+      };
+    });
+    window.google = { script: { run: new Runner() } };
+  }
+
+  /* Fill the Apps Script template tags with sample values and slip the stand-in backend into <head>. */
+  function buildPreview(html) {
+    var out = html
+      .split('<?= pageTitle ?>').join(SAMPLE.title)
+      .split('<?!= configJson ?>').join(JSON.stringify({ product: SAMPLE.product, avgKg: SAMPLE.avgKg }));
+    if (out.indexOf('<?') !== -1) throw new Error('Unknown template tag in Index.html');
+    var at = out.indexOf('</head>');
+    if (at === -1) throw new Error('Index.html has no </head>');
+    var mock = '<script>(' + previewBackend.toString() + ')(' + JSON.stringify(SAMPLE) + ');<\/script>\n';
+    return out.slice(0, at) + mock + out.slice(at);
+  }
+
+  /* ---------- copy buttons ---------- */
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  function selectPre(pre) {
+    var d = pre.closest('details'); if (d) d.open = true;
+    var r = document.createRange(); r.selectNodeContents(pre);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  function done(btn) {
+    btn.classList.add('done'); btn.textContent = '복사됨';
+    setTimeout(function () { btn.classList.remove('done'); btn.textContent = btn.dataset.label; }, 2200);
+  }
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = document.getElementById(btn.dataset.target);
+      var text = pre.textContent;
+      var hint = btn.closest('.file').querySelector('.copy-hint');
+      hint.hidden = true;
+      var fail = function () {
+        if (fallbackCopy(text)) { done(btn); return; }
+        selectPre(pre);
+        hint.textContent = '자동 복사가 막혀 있어요. 코드를 선택해 뒀으니 Ctrl/Cmd + C로 복사하세요.';
+        hint.hidden = false;
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(btn); }, fail);
+      } else { fail(); }
+    });
+  });
+
+  /* ---------- wire it up ---------- */
+  var metas = document.querySelectorAll('[data-meta]');
+  var msg = document.getElementById('previewMsg');
+  var frame = document.getElementById('preview');
+  getSources().then(function (src) {
+    document.getElementById('src-gs').textContent = src.gs;
+    document.getElementById('src-html').textContent = src.html;
+    metas[0].textContent += ' · ' + src.gs.split('\n').length + '줄';
+    metas[1].textContent += ' · ' + src.html.split('\n').length + '줄';
+    document.querySelectorAll('.copy').forEach(function (b) { b.disabled = false; b.textContent = b.dataset.label; });
+    try {
+      frame.srcdoc = buildPreview(src.html);
+      frame.hidden = false; msg.hidden = true;
+    } catch (e) {
+      msg.textContent = '미리보기를 만들지 못했어요. 코드 복사는 그대로 쓸 수 있어요.';
+    }
+  }, function () {
+    var text = '코드를 불러오지 못했어요. 이 페이지를 웹 주소로 열었는지 확인하거나, 레포의 meat-stock/apps-script 폴더에서 파일을 직접 여세요.';
+    msg.textContent = text;
+    document.querySelectorAll('.copy').forEach(function (b) {
+      b.textContent = '불러오기 실패';
+      var hint = b.closest('.file').querySelector('.copy-hint');
+      hint.textContent = text; hint.hidden = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>
