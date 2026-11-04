@@ -130,7 +130,7 @@
   <header class="hero">
     <span class="eyebrow">정육 코너 로스 추적</span>
     <h1>와규 재고 체크</h1>
-    <p class="lead">팀원이 Teams 링크를 눌러 로그인 없이 와규 개수를 입력하면, 구글 시트에 초 단위 시각과 대략적인 kg이 쌓여요. 매니저가 있어야 할 개수를 넣으면 차이와 CCTV 확인 구간이 바로 나와요.</p>
+    <p class="lead">팀원이 Teams 링크를 눌러 로그인 없이 매장에 있는 와규 갯수와 시스템에 나온 재고(kg)를 입력하면, 시트가 갯수를 kg으로 바꿔 시스템과 맞춰 봐요. 한 개쯤 차이가 나면 빨간불, 그보다 작은 무게 오차는 그냥 넘어가요.</p>
     <div class="facts">
       <span class="fact">설치 10분 정도</span>
       <span class="fact">노트북에서 하기 추천</span>
@@ -155,10 +155,9 @@
         <div class="role">
           <span class="who">팀원</span>
           <ul>
-            <li>와규 개수 하나만 입력해요. 숫자를 치거나 +/−로 맞춘 뒤 저장.</li>
-            <li>이름은 한 번만 쓰면 그 폰에 기억돼요.</li>
-            <li>진열 보충, 입고, 폐기는 메모에 한 줄.</li>
-            <li>이전 개수는 안 보여줘요. 보고 따라 적는 걸 막으려고요.</li>
+            <li>① 매장 내 보유 갯수(개)를 세서 입력, ② 시스템에서 와규 재고를 확인해 kg 그대로 입력. 칸마다 작은 한국어 안내가 있어요.</li>
+            <li>이름은 한 번만 쓰면 그 폰에 기억돼요. 진열 보충, 입고, 폐기는 메모에 한 줄.</li>
+            <li>맞는지 틀리는지는 팀원 화면에 안 보여줘요. 시스템 숫자에 맞춰 갯수를 적는 걸 막으려고요.</li>
             <li>맨 위 ‹ › 화살표로 이전·다음 화면. 집 모양 버튼이나 로고·제목을 누르면 첫 화면(개수 입력)으로 가요.</li>
           </ul>
         </div>
@@ -166,20 +165,21 @@
           <span class="who">시트</span>
           <ul>
             <li>저장 시각은 폰이 아니라 서버 시계로 초까지 찍혀요 (브리즈번 시간).</li>
-            <li>개수 × 개당 평균 무게(기본 0.1425 kg)로 대략 kg 자동 계산.</li>
-            <li>직전 카운트의 개수와 시각을 찾아 변동을 붙여요.</li>
+            <li>센 갯수 × 개당 평균 무게(0.1455 kg)로 kg을 계산해 시스템 재고와 비교해요.</li>
+            <li>차이가 ±0.10 kg 이상(약 한 개)일 때만 빨간불. 그보다 작은 건 고기마다 무게가 달라서 생기는 오차예요.</li>
+            <li>직전 카운트의 갯수와 시각을 찾아 변동을 붙여요.</li>
           </ul>
         </div>
         <div class="role">
           <span class="who">매니저</span>
           <ul>
             <li>같은 링크 하단 Manager → PIN 입력.</li>
-            <li>기록마다 있어야 할 개수(POS, 입고 기준)를 넣으면 차이가 개수, kg, $로 나와요.</li>
-            <li>상단에 부족분 합계, 아래는 날짜별 기록.</li>
+            <li>입력할 건 없어요. 기록마다 센 갯수, 시스템 kg, 차이(kg, 약 몇 개, $)와 빨간불을 확인해요.</li>
+            <li>상단에 최근 차이와 빨간불 개수, 아래는 날짜별 기록.</li>
             <li>맨 아래 <b>Reset all data</b>: "Are you sure…?"에서 한 번 더 확인하면 Log 기록을 전부 지우고 새로 시작해요.</li>
           </ul>
         </div>
-        <p class="formula">차이 = 카운트 − 매니저 재고<br><b>−2</b> 이면 2개가 비는 것. CCTV는 <b>직전 카운트 시각 → 이번 카운트 시각</b> 사이를 보면 돼요.</p>
+        <p class="formula">차이(kg) = 센 갯수 × 0.1455 − 시스템 재고(kg)<br><b>−0.145 kg</b> ≈ 한 개 부족. <b>±0.10 kg 이상</b>이면 빨간불. CCTV는 <b>직전 카운트 시각 → 이번 카운트 시각</b> 사이를 보면 돼요.</p>
       </div>
     </div>
   </section>
@@ -221,7 +221,8 @@
         <h3>Settings 탭 정리</h3>
         <ul>
           <li><span class="path">Manager PIN</span>: 1234에서 꼭 바꾸기.</li>
-          <li><span class="path">Avg kg per unit</span>: 와규 한 개 평균 무게. 0.1425로 들어가 있어요.</li>
+          <li><span class="path">Avg kg per unit</span>: 와규 한 개 평균 무게. 11월 4일에 19개를 재서 나온 0.1455 kg(2.764 kg ÷ 19)이 들어가 있어요.</li>
+          <li><span class="path">Red when off by (kg)</span>: 빨간불 기준. 0.1(약 한 개의 70%)이에요. 오탐이 많으면 조금 올리고, 놓치는 게 많으면 내리세요.</li>
           <li><span class="path">Price per kg</span>(선택): 넣으면 차이가 $로도 나와요.</li>
         </ul>
         <p class="note">시트에서 바꾼 건 재배포 없이 바로 반영돼요. 이미 저장된 줄은 저장 당시 무게와 가격을 그대로 유지해요.</p>
@@ -251,7 +252,7 @@
     <div class="file">
       <div class="file-head">
         <span class="file-name">Index.html</span>
-        <span class="file-meta" data-meta>폰 화면: 와규 개수 입력, 매니저 화면</span>
+        <span class="file-meta" data-meta>폰 화면: 보유 갯수·시스템 재고 입력, 매니저 화면</span>
         <button class="copy" type="button" id="copy-html" data-target="src-html" data-label="Index.html 복사" disabled>불러오는 중…</button>
       </div>
       <p class="copy-hint" hidden></p>
@@ -264,15 +265,15 @@
       <span class="eyebrow">Sheet</span>
       <h2 id="h-sheet">시트에 쌓이는 것</h2>
     </div>
-    <p class="muted">Log 탭에 저장 한 번에 한 줄씩. 카운트와 매니저 재고가 안 맞으면(부족이든 초과든) 차이 칸이 빨갛게 표시돼요.</p>
+    <p class="muted">Log 탭에 저장 한 번에 한 줄씩. 센 갯수를 kg으로 바꾼 값과 시스템 kg이 ±0.10 kg 이상 차이 나면(부족이든 초과든) 차이 칸이 빨갛게 표시돼요.</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>구분</th><th>열</th><th>누가 채우나</th></tr></thead>
         <tbody>
-          <tr><td class="grp">기록</td><td><span class="mono">Entry ID · Counted at · Counted by · Product · Count (units) · Avg kg / unit · Approx total kg · Note</span></td><td>팀원 입력 + 자동</td></tr>
-          <tr><td class="grp">비교</td><td><span class="mono">Previous count · Previous count at · Change (units)</span></td><td>자동</td></tr>
-          <tr><td class="grp">매니저</td><td><span class="mono">Manager stock (units) · Difference (units / kg / $) · Manager updated at</span></td><td>매니저 화면 또는 시트에 직접</td></tr>
-          <tr><td class="grp">Settings 탭</td><td><span class="mono">Manager PIN · Avg kg per unit · Price per kg · Page title</span></td><td>본인</td></tr>
+          <tr><td class="grp">기록</td><td><span class="mono">Entry ID · Counted at · Counted by · Product · Count (units) · System stock (kg) · Note</span></td><td>팀원 입력 + 자동</td></tr>
+          <tr><td class="grp">비교</td><td><span class="mono">Avg kg / unit · Counted kg (approx) · Difference (kg / units / $)</span></td><td>자동 (빨간불)</td></tr>
+          <tr><td class="grp">변동</td><td><span class="mono">Previous count · Previous count at · Change (units)</span></td><td>자동</td></tr>
+          <tr><td class="grp">Settings 탭</td><td><span class="mono">Manager PIN · Avg kg per unit · Red when off by (kg) · Price per kg · Page title</span></td><td>본인</td></tr>
         </tbody>
       </table>
     </div>
@@ -290,7 +291,7 @@
       <li>매니저 PIN은 10번 틀리면 15분 잠겨요. 가벼운 잠금이라 PIN은 팀 채팅에 올리지 마세요.</li>
       <li>코드를 바꿀 때는 두 파일을 붙여넣고 저장한 뒤 <span class="path">배포 → 배포 관리 → 연필 → 버전: 새 버전 → 배포</span>. 링크는 그대로 유지되고, 시트의 빨간 표시 규칙은 다음에 페이지를 열 때 자동으로 새로 맞춰져요.</li>
       <li>Reset으로 지운 기록은 시트의 <span class="path">파일 → 버전 기록</span>에서 지우기 전 버전을 열어 되돌릴 수 있어요.</li>
-      <li>예전 여러 품목 버전을 이미 설치했다면 두 파일을 이 코드로 바꾸고 setup을 한 번 더 실행한 뒤 새 버전으로 배포하세요. 기존 Log는 그대로 쓰고, Settings에 무게와 가격 줄이 추가돼요. Products 탭은 지워도 돼요.</li>
+      <li>이전 버전(매니저가 재고를 넣던 버전)에서 바꾸면, 새 버전으로 배포한 뒤 페이지를 처음 열 때 기존 Log 탭이 <span class="path">Log (old)</span>로 이름이 바뀌어 보관되고 새 Log가 생겨요. 기록이 없던 Log는 그냥 새 형식으로 바뀌어요. Settings에는 빨간불 기준 줄이 추가되고, 평균 무게가 처음 값(0.1425) 그대로면 0.1455로 바뀌어요.</li>
       <li>지금은 와규 전용 화면이에요. Log에 Product 열을 남겨 둬서 나중에 품목을 늘려도 기존 기록을 그대로 쓸 수 있어요.</li>
     </ul>
   </section>
@@ -301,7 +302,7 @@
 <script>
 (function () {
   document.documentElement.lang = 'ko';
-  var SAMPLE = { title: 'Wagyu Stock Check', product: 'Wagyu', avgKg: 0.1425, price: 89.9, pin: '1234' };
+  var SAMPLE = { title: 'Wagyu Stock Check', product: 'Wagyu', avgKg: 0.1455, tolKg: 0.1, price: 89.9, pin: '1234' };
 
   /* ---------- load the two files (embedded copy first, then the files next to this page) ---------- */
   function okText(res) { if (!res.ok) throw new Error(res.status + ' ' + res.statusText); return res.text(); }
@@ -329,20 +330,19 @@
       } catch (e) { return d.toISOString().slice(0, 19).replace('T', ' '); }
     }
     var rows = [], seq = 0;
-    function add(minsAgo, by, count, note, stock) {
+    function add(minsAgo, by, count, systemKg, note) {
       var d = new Date(Date.now() - minsAgo * 60000), prev = null;
       rows.forEach(function (r) { if (r.atMs <= d.getTime() && (!prev || r.atMs >= prev.atMs)) prev = r; });
       seq++;
       rows.push({ id: 'demo-' + seq, n: seq, atMs: d.getTime(), at: fmt(d), by: by, count: count, avgKg: S.avgKg,
-        prevCount: prev ? prev.count : null, prevAt: prev ? prev.at : '', note: note || '',
-        stock: stock == null ? null : stock, price: S.price });
+        systemKg: systemKg, price: S.price, prevCount: prev ? prev.count : null, prevAt: prev ? prev.at : '', note: note || '' });
     }
-    add(1560, 'Sam', 18, '', 18);
-    add(1290, 'Jess', 12, '', 13);
-    add(400, 'Jess', 14, '', 14);
-    add(260, 'Tom', 11, '', 12);
-    add(150, 'Priya', 15, 'put out 6 from the cool room', 17);
-    add(35, 'Tom', 12, '', null);
+    add(1560, 'Sam', 18, 2.62, '');
+    add(1290, 'Jess', 12, 1.89, '');
+    add(400, 'Jess', 14, 2.05, '');
+    add(260, 'Tom', 11, 1.45, '');
+    add(150, 'Priya', 15, 2.2, 'put out 6 from the cool room');
+    add(35, 'Tom', 19, 2.764, '');
 
     var API = {
       submitCount: function (p) {
@@ -350,24 +350,21 @@
         if (!by) throw new Error('Please enter your name.');
         var n = Number(p.count);
         if (!(n >= 0 && n <= 9999 && Math.floor(n) === n)) throw new Error('Check the count. Use a whole number from 0 to 9999.');
-        add(0, by, n, String(p.note || '').trim(), null);
-        return { ok: true, count: n, at: fmt(new Date()) };
+        var k = p.systemKg === '' || p.systemKg == null ? NaN : Number(p.systemKg);
+        if (!isFinite(k)) throw new Error('Check the system stock. Use kg, like 2.764.');
+        k = Math.round(k * 1000) / 1000;
+        add(0, by, n, k, String(p.note || '').trim());
+        return { ok: true, count: n, systemKg: k, at: fmt(new Date()) };
       },
       getRecent: function (pin) {
         if (String(pin).trim() !== S.pin) throw new Error('Wrong PIN. (The preview PIN is ' + S.pin + ')');
-        return { rows: rows.slice().sort(function (a, b) { return (b.atMs - a.atMs) || (b.n - a.n); }), total: rows.length };
+        return { rows: rows.slice().sort(function (a, b) { return (b.atMs - a.atMs) || (b.n - a.n); }), total: rows.length, tolKg: S.tolKg };
       },
       resetAll: function (pin) {
         if (String(pin).trim() !== S.pin) throw new Error('Wrong PIN. (The preview PIN is ' + S.pin + ')');
         var n = rows.length;
         rows.length = 0;
         return { ok: true, cleared: n };
-      },
-      setStock: function (pin, id, v) {
-        var r = rows.filter(function (x) { return x.id === id; })[0];
-        if (!r) throw new Error('Entry not found. Refresh the list.');
-        r.stock = v === '' ? null : v;
-        return { ok: true, id: id, stock: v, at: fmt(new Date()) };
       }
     };
     function Runner(ok, fail) { this._ok = ok; this._fail = fail; }
@@ -391,7 +388,7 @@
   function buildPreview(html) {
     var out = html
       .split('<?= pageTitle ?>').join(SAMPLE.title)
-      .split('<?!= configJson ?>').join(JSON.stringify({ product: SAMPLE.product, avgKg: SAMPLE.avgKg }));
+      .split('<?!= configJson ?>').join(JSON.stringify({ product: SAMPLE.product }));
     if (out.indexOf('<?') !== -1) throw new Error('Unknown template tag in Index.html');
     var at = out.indexOf('</head>');
     if (at === -1) throw new Error('Index.html has no </head>');

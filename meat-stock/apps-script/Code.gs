@@ -8,9 +8,11 @@
  *      Execute as: Me    Who has access: Anyone
  * 5. Share the web app URL. Nobody needs to log in to use it.
  *
- * The page counts one product (Wagyu). Its average weight, price and the
- * manager PIN live in the Settings tab, so they can change without a redeploy.
- * Any difference that is not 0 (short or over) is shown in red in the Log.
+ * Staff enter two numbers: the Wagyu pieces they counted in the store and the
+ * stock the system shows in kg. The Log turns the count into kg (count × average
+ * weight per piece) and compares it with the system. A gap of about one piece or
+ * more turns red (Settings → "Red when off by (kg)"); smaller gaps are normal
+ * differences in piece weight.
  */
 
 const TZ = 'Australia/Brisbane';
@@ -20,27 +22,30 @@ const SETTINGS = 'Settings';
 const DATE_FMT = 'yyyy-mm-dd hh:mm:ss';
 const SHOW_FMT = 'yyyy-MM-dd HH:mm:ss';
 
+const DEFAULT_AVG_KG = 0.1455;      // 19 pieces weighed on 4 Nov 2026: 2.764 kg ÷ 19
+const OLD_DEFAULT_AVG_KG = 0.1425;  // the first guess; replaced once if it is still in Settings
+const DEFAULT_TOL_KG = 0.1;         // about 70% of one piece
+const SCHEMA = '3';                 // bump when the Log layout or Settings rows change
+const RULES_VERSION = '3';          // bump when applyRules_ changes
+
 /** Settings rows: [name, default value, number format, what it does]. */
 const SETTING_ROWS = [
   ['Manager PIN', '1234', '@', 'Change this. 10 wrong tries locks the manager screen for 15 minutes.'],
-  ['Avg kg per unit', 0.1425, '0.0000', 'Average weight of one ' + PRODUCT + ' unit in kg. Used for the approx kg.'],
+  ['Avg kg per unit', DEFAULT_AVG_KG, '0.0000', 'Average weight of one ' + PRODUCT + ' piece in kg. 19 pieces weighed 2.764 kg on 4 Nov 2026, so 0.1455.'],
+  ['Red when off by (kg)', DEFAULT_TOL_KG, '0.000', 'Counted kg vs system kg: a gap this size or bigger turns red. One piece is about 0.145 kg; smaller gaps are normal weight differences.'],
   ['Price per kg', '', '$0.00', 'Optional. When set, differences also show in dollars.'],
   ['Page title', PRODUCT + ' Stock Check', '@', 'Shown at the top of the page.']
 ];
-const DEFAULT_AVG_KG = 0.1425;
-const RULES_VERSION = '2';   // bump when applyRules_ changes, so existing sheets pick it up
 
 const COL = {
-  id: 1, at: 2, by: 3, product: 4, count: 5, avgKg: 6, totalKg: 7,
-  prevCount: 8, prevAt: 9, change: 10, note: 11,
-  stock: 12, diff: 13, diffKg: 14, price: 15, diffCost: 16, mgrAt: 17
+  id: 1, at: 2, by: 3, product: 4, count: 5, avgKg: 6, countKg: 7, sysKg: 8,
+  diffKg: 9, diffUnits: 10, price: 11, diffCost: 12, prevCount: 13, prevAt: 14, change: 15, note: 16
 };
 
 const LOG_HEADERS = [
   'Entry ID', 'Counted at', 'Counted by', 'Product', 'Count (units)', 'Avg kg / unit',
-  'Approx total kg', 'Previous count', 'Previous count at', 'Change (units)', 'Note',
-  'Manager stock (units)', 'Difference (units)', 'Difference (kg)', 'Price ($/kg)',
-  'Difference ($)', 'Manager updated at'
+  'Counted kg (approx)', 'System stock (kg)', 'Difference (kg)', 'Difference (units)',
+  'Price ($/kg)', 'Difference ($)', 'Previous count', 'Previous count at', 'Change (units)', 'Note'
 ];
 
 /* ---------------------------------------------------------------- setup */
@@ -49,33 +54,34 @@ function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.setSpreadsheetTimeZone(TZ);
 
-  // Log
-  let log = ss.getSheetByName(LOG);
-  if (!log) log = ss.insertSheet(LOG, 0);
-  if (log.getLastRow() === 0) {
-    log.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS])
-      .setFontWeight('bold').setBackground('#2b2422').setFontColor('#ffffff')
-      .setWrap(true).setVerticalAlignment('middle');
-    log.setFrozenRows(1);
-    log.setRowHeight(1, 42);
-    log.setColumnWidths(1, LOG_HEADERS.length, 110);
-    [COL.id, COL.at, COL.prevAt, COL.mgrAt].forEach(c => log.setColumnWidth(c, 160));
-    log.setColumnWidth(COL.note, 220);
-  }
-  applyRules_(log);
-
-  // Settings
+  // Settings first: the red rule on the Log reads its threshold from here
   let set = ss.getSheetByName(SETTINGS);
   if (!set) set = ss.insertSheet(SETTINGS);
   if (set.getLastRow() === 0) {
     set.getRange(1, 1, 1, 3).setValues([['Setting', 'Value', 'What it does']])
-      .setFontWeight('bold').setBackground('#2b2422').setFontColor('#ffffff');
+      .setFontWeight('bold').setBackground('#307029').setFontColor('#ffffff');
     set.setFrozenRows(1);
-    set.setColumnWidth(1, 160);
+    set.setColumnWidth(1, 170);
     set.setColumnWidth(2, 190);
-    set.setColumnWidth(3, 440);
+    set.setColumnWidth(3, 480);
   }
   ensureSettings_(set);
+
+  // Log (a Log made by older code is kept as "Log (old)" and a new one starts)
+  let log = ss.getSheetByName(LOG);
+  if (log && isOldLog_(log)) log = retireLog_(ss, log);
+  if (!log) log = ss.insertSheet(LOG, 0);
+  if (log.getLastRow() === 0) {
+    log.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS])
+      .setFontWeight('bold').setBackground('#307029').setFontColor('#ffffff')
+      .setWrap(true).setVerticalAlignment('middle');
+    log.setFrozenRows(1);
+    log.setRowHeight(1, 42);
+    log.setColumnWidths(1, LOG_HEADERS.length, 110);
+    [COL.id, COL.at, COL.prevAt].forEach(c => log.setColumnWidth(c, 160));
+    log.setColumnWidth(COL.note, 220);
+  }
+  applyRules_(log);
 
   // Remove the blank starter tab if it is still empty
   ['Sheet1', '시트1'].forEach(n => {
@@ -87,60 +93,118 @@ function setup() {
   return 'Setup done';
 }
 
-/** Add any missing setting rows. Values that are already there are left alone. */
+/** Add missing setting rows and refresh the help text. Values already there are left alone. */
 function ensureSettings_(set) {
-  const have = {};
+  const rowOf = {};
   const last = set.getLastRow();
   if (last > 0) {
     set.getRange(1, 1, last, 1).getValues()
-      .forEach(r => { have[String(r[0]).trim().toLowerCase()] = true; });
+      .forEach((r, i) => { rowOf[String(r[0]).trim().toLowerCase()] = i + 1; });
   }
   SETTING_ROWS.forEach(([name, value, format, help]) => {
-    if (have[name.toLowerCase()]) return;
+    const at = rowOf[name.toLowerCase()];
+    if (at) { set.getRange(at, 3).setValue(help).setFontColor('#566352'); return; }
     const r = set.getLastRow() + 1;
     set.getRange(r, 2).setNumberFormat(format);
     set.getRange(r, 1, 1, 3).setValues([[name, value, help]]);
-    set.getRange(r, 3).setFontColor('#6b615a');
+    set.getRange(r, 3).setFontColor('#566352');
   });
 }
 
-/**
- * Red background on Difference (units / kg / $) whenever the count and the
- * manager stock don't match: short (minus) or over (plus). Blank cells stay plain.
- */
-function applyRules_(log) {
-  const rows = Math.max(log.getMaxRows() - 1, 1);
-  const mismatch = (col, width) => {
-    const a1 = colLetter_(col) + '2';
-    return SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(ISNUMBER(' + a1 + '),' + a1 + '<>0)')
-      .setBackground('#fde4e1').setFontColor('#a8231a')
-      .setRanges([log.getRange(2, col, rows, width)])
-      .build();
-  };
-  const keep = log.getConditionalFormatRules().filter(r => {
-    const ranges = r.getRanges();
-    return !ranges.some(g => g.getColumn() === COL.diff || g.getColumn() === COL.diffCost);
-  });
-  keep.push(mismatch(COL.diff, 2), mismatch(COL.diffCost, 1));
-  log.setConditionalFormatRules(keep);
-  PropertiesService.getScriptProperties().setProperty('rulesVersion', RULES_VERSION);
-}
-
-/** Bring the red-difference rule up to date on sheets set up with older code. */
-function ensureRules_() {
-  try {
-    if (PropertiesService.getScriptProperties().getProperty('rulesVersion') === RULES_VERSION) return;
-    applyRules_(logSheet_());
-  } catch (e) {
-    // formatting must never stop the page from opening
+/** The first version guessed 0.1425 kg a piece. If that guess is still there, use the measured average. */
+function updateOldAverage_(set) {
+  const last = set.getLastRow();
+  if (last < 1) return;
+  const vals = set.getRange(1, 1, last, 2).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).trim().toLowerCase() !== 'avg kg per unit') continue;
+    const v = num_(vals[i][1]);
+    if (v !== null && Math.abs(v - OLD_DEFAULT_AVG_KG) < 1e-9) set.getRange(i + 1, 2).setValue(DEFAULT_AVG_KG);
+    return;
   }
 }
 
-function colLetter_(n) {
-  let s = '';
-  for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
-  return s;
+/** A Log made by older code (manager stock in units) has "Previous count" in column H. */
+function isOldLog_(log) {
+  return log.getLastRow() > 0 && String(log.getRange(1, 8).getValue()).trim() === 'Previous count';
+}
+
+/** Keep the old rows in a renamed tab, or clear the tab if it has none, so the new Log starts clean. */
+function retireLog_(ss, log) {
+  if (log.getLastRow() <= 1) {
+    log.clear();
+    log.clearConditionalFormatRules();
+    return log;
+  }
+  let name = LOG + ' (old)';
+  for (let i = 2; ss.getSheetByName(name); i++) name = LOG + ' (old ' + i + ')';
+  log.setName(name);
+  return null;
+}
+
+/**
+ * Red background on Difference (kg / units / $) when the counted kg and the
+ * system kg are apart by the "Red when off by (kg)" amount or more, either way.
+ * Blank cells stay plain.
+ */
+function applyRules_(log, tolKg) {
+  const tol = tolKg == null ? config_().tolKg : tolKg;
+  const rows = Math.max(log.getMaxRows() - 1, 1);
+  const ref = '$' + colLetter_(COL.diffKg) + '2';
+  const formula = '=AND(ISNUMBER(' + ref + '),ABS(' + ref + ')>=' + tol + ')';
+  const rule = range => SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(formula)
+    .setBackground('#fde4e1').setFontColor('#a8231a')
+    .setRanges([range])
+    .build();
+  const mine = [COL.diffKg, COL.diffUnits, COL.diffCost];
+  const keep = log.getConditionalFormatRules()
+    .filter(r => !r.getRanges().some(g => mine.indexOf(g.getColumn()) !== -1));
+  keep.push(rule(log.getRange(2, COL.diffKg, rows, 2)), rule(log.getRange(2, COL.diffCost, rows, 1)));
+  log.setConditionalFormatRules(keep);
+  PropertiesService.getScriptProperties().setProperty('rules', rulesKey_(tol));
+}
+
+function rulesKey_(tol) { return RULES_VERSION + ':' + tol; }
+
+/** Keep the red rule in line with Settings (re-applied after "Red when off by (kg)" changes). */
+function ensureRules_() {
+  try {
+    const tol = config_().tolKg;
+    if (PropertiesService.getScriptProperties().getProperty('rules') === rulesKey_(tol)) return;
+    applyRules_(logSheet_(), tol);
+  } catch (e) {
+    console.error(e); // formatting must never stop the page from opening
+  }
+}
+
+/**
+ * Runs when the page opens. A sheet made with older code is brought up to date
+ * once (new Log layout, new Settings rows, the measured average weight), then
+ * the red rule is kept in line with Settings.
+ */
+function prepare_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty('schema') !== SCHEMA) {
+      const lock = LockService.getScriptLock();
+      if (lock.tryLock(15000)) {
+        try {
+          if (props.getProperty('schema') !== SCHEMA) {
+            setup();   // new Settings rows, new Log layout, red rule
+            const set = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTINGS);
+            if (set) updateOldAverage_(set);
+            props.setProperty('schema', SCHEMA);
+          }
+        } finally {
+          lock.releaseLock();
+        }
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  ensureRules_();
 }
 
 function ensureRows_(sheet, lastNeeded) {
@@ -154,11 +218,11 @@ function ensureRows_(sheet, lastNeeded) {
 /* ---------------------------------------------------------------- web app */
 
 function doGet() {
-  ensureRules_();
+  prepare_();
   const cfg = config_();
   const t = HtmlService.createTemplateFromFile('Index');
   t.pageTitle = cfg.title;
-  t.configJson = JSON.stringify({ product: PRODUCT, avgKg: cfg.avgKg }).replace(/</g, '\\u003c');
+  t.configJson = JSON.stringify({ product: PRODUCT }).replace(/</g, '\\u003c');
   return t.evaluate()
     .setTitle(cfg.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
@@ -166,18 +230,17 @@ function doGet() {
 
 /**
  * Save one Wagyu count.
- * payload = { by: 'Sam', count: 8, note: 'put out 6 from the cool room' }
+ * payload = { by: 'Sam', count: 19, systemKg: 2.764, note: 'put out 6 from the cool room' }
  */
 function submitCount(payload) {
   if (!payload || typeof payload !== 'object') throw new Error('Nothing to save.');
   const by = cleanText_(payload.by, 40);
   if (!by) throw new Error('Please enter your name.');
   const note = cleanText_(payload.note, 200);
-  const raw = payload.count;
-  const count = raw === '' || raw === null || raw === undefined ? NaN : Number(raw);
-  if (!Number.isInteger(count) || count < 0 || count > 9999) {
-    throw new Error('Check the count. Use a whole number from 0 to 9999.');
-  }
+  const count = wholeNumber_(payload.count);
+  if (count === null) throw new Error('Check the count. Use a whole number from 0 to 9999.');
+  const sysKg = kgNumber_(payload.systemKg);
+  if (sysKg === null) throw new Error('Check the system stock. Use kg, like 2.764.');
   const cfg = config_();
 
   const lock = LockService.getScriptLock();
@@ -189,6 +252,7 @@ function submitCount(payload) {
     const r = log.getLastRow() + 1;
     ensureRows_(log, r);
 
+    const c = col => colLetter_(col) + r;
     const id = Utilities.formatDate(now, TZ, 'yyMMdd-HHmmss') + '-' + Utilities.getUuid().slice(0, 4);
     log.getRange(r, 1, 1, LOG_HEADERS.length).setValues([[
       id,
@@ -197,22 +261,21 @@ function submitCount(payload) {
       PRODUCT,
       count,
       cfg.avgKg,
-      '=IF(E' + r + '="","",ROUND(E' + r + '*F' + r + ',3))',
+      '=IF(' + c(COL.count) + '="","",ROUND(' + c(COL.count) + '*' + c(COL.avgKg) + ',3))',
+      sysKg,
+      '=IF(OR(' + c(COL.countKg) + '="",' + c(COL.sysKg) + '=""),"",ROUND(' + c(COL.countKg) + '-' + c(COL.sysKg) + ',3))',
+      '=IF(OR(' + c(COL.diffKg) + '="",N(' + c(COL.avgKg) + ')=0),"",ROUND(' + c(COL.diffKg) + '/' + c(COL.avgKg) + ',1))',
+      cfg.price,
+      '=IF(OR(' + c(COL.diffKg) + '="",' + c(COL.price) + '=""),"",ROUND(' + c(COL.diffKg) + '*' + c(COL.price) + ',2))',
       prev ? prev.count : '',
       prev ? prev.at : '',
-      '=IF(H' + r + '="","",E' + r + '-H' + r + ')',
-      note,
-      '',
-      '=IF(L' + r + '="","",E' + r + '-L' + r + ')',
-      '=IF(M' + r + '="","",ROUND(M' + r + '*F' + r + ',3))',
-      cfg.price,
-      '=IF(OR(M' + r + '="",O' + r + '=""),"",ROUND(M' + r + '*F' + r + '*O' + r + ',2))',
-      ''
+      '=IF(' + c(COL.prevCount) + '="","",' + c(COL.count) + '-' + c(COL.prevCount) + ')',
+      note
     ]]);
     formatRows_(log, r, 1);
     SpreadsheetApp.flush();
 
-    return { ok: true, count: count, at: Utilities.formatDate(now, TZ, SHOW_FMT) };
+    return { ok: true, count: count, systemKg: sysKg, at: Utilities.formatDate(now, TZ, SHOW_FMT) };
   } finally {
     lock.releaseLock();
   }
@@ -221,10 +284,10 @@ function submitCount(payload) {
 /* ---------------------------------------------------------------- manager */
 
 function getRecent(pin, limit) {
-  checkPin_(pin);
+  const cfg = checkPin_(pin);
   const log = logSheet_();
   const last = log.getLastRow();
-  if (last < 2) return { rows: [], total: 0 };
+  if (last < 2) return { rows: [], total: 0, tolKg: cfg.tolKg };
 
   const span = Math.min(last - 1, 3000);
   const vals = log.getRange(last - span + 1, 1, span, LOG_HEADERS.length).getValues();
@@ -241,43 +304,15 @@ function getRecent(pin, limit) {
       by: String(r[COL.by - 1]),
       count: num_(r[COL.count - 1]),
       avgKg: num_(r[COL.avgKg - 1]),
+      systemKg: num_(r[COL.sysKg - 1]),
+      price: num_(r[COL.price - 1]),
       prevCount: num_(r[COL.prevCount - 1]),
       prevAt: fmt_(r[COL.prevAt - 1]),
-      note: String(r[COL.note - 1]),
-      stock: num_(r[COL.stock - 1]),
-      price: num_(r[COL.price - 1])
+      note: String(r[COL.note - 1])
     });
   });
   rows.sort((a, b) => (b.atMs - a.atMs) || (b.idx - a.idx));
-  return { rows: rows.slice(0, max), total: rows.length };
-}
-
-function setStock(pin, id, value) {
-  checkPin_(pin);
-  let v = '';
-  if (value !== '' && value !== null && value !== undefined) {
-    v = Number(value);
-    if (!Number.isInteger(v) || v < 0 || v > 9999) throw new Error('Enter a whole number (0 or more).');
-  }
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const log = logSheet_();
-    const last = log.getLastRow();
-    if (last < 2) throw new Error('Entry not found. Refresh the list.');
-    const cell = log.getRange(2, COL.id, last - 1, 1)
-      .createTextFinder(String(id)).matchEntireCell(true).findNext();
-    if (!cell) throw new Error('Entry not found. Refresh the list.');
-    const r = cell.getRow();
-    const now = new Date();
-    log.getRange(r, COL.stock).setValue(v);
-    log.getRange(r, COL.mgrAt).setValue(v === '' ? '' : now).setNumberFormat(DATE_FMT);
-    applyRules_(log);
-    SpreadsheetApp.flush();
-    return { ok: true, id: String(id), stock: v, at: v === '' ? '' : Utilities.formatDate(now, TZ, SHOW_FMT) };
-  } finally {
-    lock.releaseLock();
-  }
+  return { rows: rows.slice(0, max), total: rows.length, tolKg: cfg.tolKg };
 }
 
 /**
@@ -305,12 +340,13 @@ function resetAll(pin) {
 
 function logSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let log = ss.getSheetByName(LOG);
-  if (!log) { setup(); log = ss.getSheetByName(LOG); }
-  return log;
+  const log = ss.getSheetByName(LOG);
+  if (log && log.getLastRow() > 0 && !isOldLog_(log)) return log;
+  setup();
+  return ss.getSheetByName(LOG);
 }
 
-/** Settings tab as { pin, avgKg, price, title }, with safe fallbacks. */
+/** Settings tab as { pin, avgKg, tolKg, price, title }, with safe fallbacks. */
 function config_() {
   const s = {};
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTINGS);
@@ -321,11 +357,13 @@ function config_() {
     });
   }
   const avg = num_(s['avg kg per unit']);
+  const tol = num_(s['red when off by (kg)']);
   const price = num_(s['price per kg']);
   const title = String(s['page title'] == null ? '' : s['page title']).trim();
   return {
     pin: String(s['manager pin'] == null ? '' : s['manager pin']).trim(),
     avgKg: avg !== null && avg > 0 && avg < 50 ? avg : DEFAULT_AVG_KG,
+    tolKg: tol !== null && tol > 0 && tol < 100 ? tol : DEFAULT_TOL_KG,
     price: price !== null && price > 0 ? price : '',
     title: title || PRODUCT + ' Stock Check'
   };
@@ -350,24 +388,27 @@ function lastCount_(log) {
 function formatRows_(log, start, n) {
   log.getRange(start, COL.at, n, 1).setNumberFormat(DATE_FMT);
   log.getRange(start, COL.prevAt, n, 1).setNumberFormat(DATE_FMT);
-  log.getRange(start, COL.mgrAt, n, 1).setNumberFormat(DATE_FMT);
-  log.getRange(start, COL.avgKg, n, 2).setNumberFormat('0.000');
-  log.getRange(start, COL.diffKg, n, 1).setNumberFormat('0.000');
+  log.getRange(start, COL.avgKg, n, 1).setNumberFormat('0.0000');
+  log.getRange(start, COL.countKg, n, 2).setNumberFormat('0.000');
+  log.getRange(start, COL.diffKg, n, 1).setNumberFormat('+0.000;-0.000;0.000');
+  log.getRange(start, COL.diffUnits, n, 1).setNumberFormat('+0.0;-0.0;0.0');
   log.getRange(start, COL.price, n, 1).setNumberFormat('$0.00');
-  log.getRange(start, COL.diffCost, n, 1).setNumberFormat('$0.00;-$0.00');
+  log.getRange(start, COL.diffCost, n, 1).setNumberFormat('+$0.00;-$0.00;$0.00');
 }
 
+/** Checks the manager PIN and returns the Settings so callers don't read them twice. */
 function checkPin_(pin) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('pinFails') || 0);
   if (fails >= 10) throw new Error('Too many wrong PINs. Try again in 15 minutes.');
-  const real = config_().pin;
-  if (!real) throw new Error('Set a Manager PIN in the Settings tab first.');
-  if (String(pin == null ? '' : pin).trim() !== real) {
+  const cfg = config_();
+  if (!cfg.pin) throw new Error('Set a Manager PIN in the Settings tab first.');
+  if (String(pin == null ? '' : pin).trim() !== cfg.pin) {
     cache.put('pinFails', String(fails + 1), 900);
     throw new Error('Wrong PIN.');
   }
   if (fails) cache.remove('pinFails');
+  return cfg;
 }
 
 /** Trim, collapse whitespace, and stop text from being read as a formula. */
@@ -392,4 +433,27 @@ function num_(v) {
   if (t === '') return null;
   const n = Number(t);
   return isFinite(n) ? n : null;
+}
+
+/** Whole number 0–9999, or null. */
+function wholeNumber_(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 9999 ? n : null;
+}
+
+/** Kilograms with up to 3 decimals ("2,764" works too), or null. */
+function kgNumber_(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const t = typeof v === 'number' ? v : String(v).trim().replace(',', '.');
+  if (t === '') return null;
+  const n = Number(t);
+  if (!isFinite(n) || n < -9999 || n > 9999) return null;
+  return Math.round(n * 1000) / 1000;
+}
+
+function colLetter_(n) {
+  let s = '';
+  for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  return s;
 }
