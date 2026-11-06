@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= pageTitle ?></title>
 <style>
-  /* Hanaromart look: a deep brand-green app bar carrying the logo, light cards below,
+  /* Hanaromart look: a deep brand-green app bar carrying the logo, one light card per product,
      one green primary action per screen; red is kept for mismatches and the reset. */
   :root {
     --brand: #49a93e;
@@ -33,6 +33,7 @@
   body {
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-text-size-adjust: 100%;
+    word-break: keep-all; overflow-wrap: anywhere;   /* Korean wraps between words, not inside them */
     padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   }
   body.modal-open { overflow: hidden; }
@@ -40,7 +41,7 @@
   button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   button:disabled { cursor: default; }
   :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
-  main:focus, h2:focus { outline: none; }
+  main:focus, h2:focus, .err-summary:focus { outline: none; }
   [hidden] { display: none !important; }
   svg { display: block; flex: none; }
   .num { font-variant-numeric: tabular-nums; }
@@ -81,21 +82,38 @@
 
   .saved { display: flex; gap: 10px; align-items: flex-start; background: var(--pos-bg); color: var(--pos); border-radius: 14px; padding: 12px 14px; }
   .saved b { display: block; font-size: 16px; }
-  .saved span { font-size: 14px; }
+  .saved .num { font-size: 14px; }
   .saved svg { margin-top: 1px; }
+  .saved-list { margin: 6px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 600; }
 
-  /* the two numbers: 1 count in store, 2 system stock */
-  .entry-card { padding: 14px 16px 16px; }
-  .c-name { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; }
+  .err-summary { border: 2px solid var(--neg); background: var(--neg-bg); border-radius: 14px; padding: 12px 14px; }
+  .err-summary h2 { margin: 0 0 6px; font-size: 16px; color: var(--neg); }
+  .err-summary ul { margin: 0; padding: 0; list-style: none; }
+  .err-summary li + li { border-top: 1px solid var(--neg); }
+  .err-summary a { display: block; padding: 9px 0; color: var(--neg); font-weight: 600; font-size: 15px; text-underline-offset: 3px; }
+
+  /* ---------- one card per product: 1 in store (pieces), 2 system stock (kg or pieces) ---------- */
+  .pcard { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pcard.later { border-style: dashed; border-color: var(--line-strong); }
+  .p-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .p-name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.25; letter-spacing: -.01em; }
+  .p-ko { font-size: 15px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
+  .tag { flex: none; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .p-note { margin: -4px 0 0; font-size: 14px; color: var(--muted); }
+  .disclose { align-self: flex-start; }
+  .p-body { display: flex; flex-direction: column; gap: 14px; }
+  .p-field { display: flex; flex-direction: column; }
+  .p-lab { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
   .stepno {
-    width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--on-primary);
-    display: grid; place-items: center; font-size: 14px; font-weight: 800; flex: none;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: var(--on-primary);
+    display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none;
   }
-  .ko { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
-  .entry-card .ko { padding-left: 36px; }
-  .stepper { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 10px; align-items: center; margin-top: 12px; }
+  .ko { margin: 2px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .p-field .ko { padding-left: 30px; }
+  .stepper { display: grid; grid-template-columns: 60px minmax(0, 1fr) 60px; gap: 10px; align-items: center; margin-top: 8px; }
   .stepbtn {
-    height: 64px; border-radius: 16px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink);
+    height: 56px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink);
     display: grid; place-items: center; transition: background-color .15s ease-out, color .15s ease-out;
   }
   .stepbtn.plus { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
@@ -103,15 +121,15 @@
   .stepbtn.plus:active:not([aria-disabled="true"]) { background: var(--primary); color: var(--on-primary); }
   .stepbtn[aria-disabled="true"] { opacity: .4; cursor: default; }
   .qty, .sys-in {
-    width: 100%; height: 64px; font-weight: 800; letter-spacing: -.01em;
-    border: 1.5px solid var(--line-strong); border-radius: 16px; background: var(--card); outline: none;
+    width: 100%; height: 56px; font-weight: 800; letter-spacing: -.01em;
+    border: 1.5px solid var(--line-strong); border-radius: 14px; background: var(--card); outline: none;
     font-variant-numeric: tabular-nums;
   }
-  .qty { text-align: center; font-size: 40px; padding: 0 4px; }
-  .sys-wrap { position: relative; margin-top: 12px; }
-  .sys-in { text-align: right; font-size: 32px; padding: 0 58px 0 14px; }
+  .qty { text-align: center; font-size: 34px; padding: 0 4px; }
+  .sys-wrap { position: relative; margin-top: 8px; }
+  .sys-in { text-align: right; font-size: 28px; padding: 0 64px 0 14px; }
   .sys-in::placeholder { color: var(--line-strong); font-weight: 400; }
-  .sys-unit { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 20px; font-weight: 700; color: var(--muted); pointer-events: none; }
+  .sys-unit { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 700; color: var(--muted); pointer-events: none; }
 
   /* name and note */
   .fields { display: flex; flex-direction: column; gap: 14px; }
@@ -178,34 +196,44 @@
   .pinrow .field { flex: 1; min-width: 0; }
   .pinrow .primary { width: auto; min-width: 104px; height: 48px; padding: 0 16px; font-size: 16px; }
   .muted { color: var(--muted); font-size: 14px; margin: 0; }
-  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .tot { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
-  .tot .k { font-size: 13px; color: var(--muted); }
-  .tot .v { font-size: 22px; font-weight: 800; }
-  .tot .s { font-size: 13px; color: var(--muted); }
-  .tot.bad { border-color: var(--neg); background: var(--neg-bg); }
-  .tot.bad .v, .tot.bad .s { color: var(--neg); }
-  .totals .muted { grid-column: 1 / -1; }
+  .summary h3 { margin: 0 0 4px; font-size: 16px; }
+  .sum-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .sum-row:first-of-type { border-top: 0; }
+  .sum-name { font-weight: 800; }
+  .sum-name .p-ko { font-size: 14px; }
+  .sum-when { font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .sum-row .pill { grid-column: 1 / -1; }
+  .summary .muted { padding-top: 8px; border-top: 1px solid var(--line); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--card);
+    font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .chip .n { font-variant-numeric: tabular-nums; opacity: .8; }
   .day { margin: 8px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-  .entry { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .entry { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
   .entry.flag { border-color: var(--neg); }
   .e-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .e-time { font-size: 18px; font-weight: 800; }
   .e-by { font-size: 14px; color: var(--muted); text-align: right; overflow-wrap: anywhere; }
-  .figs { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 4px 0 2px; font-size: 15px; }
+  .li { display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .li.flag { border-top-color: transparent; background: var(--neg-bg); border-radius: 12px; padding: 10px 12px; }
+  .li-name { font-weight: 800; font-size: 16px; }
+  .figs { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 15px; }
   .figs dt { color: var(--muted); }
   .figs dd { margin: 0; font-weight: 700; }
   .figs dd .muted { font-weight: 400; font-size: 15px; }
-  .e-line { margin: 0; font-size: 15px; }
-  .e-line .muted { font-size: 15px; }
   .e-cctv { margin: 0; font-size: 14px; color: var(--muted); }
-  .e-note { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; overflow-wrap: anywhere; }
+  .e-note { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; overflow-wrap: anywhere; }
   .chg-neg { color: var(--neg); font-weight: 700; }
   .chg-pos { color: var(--pos); font-weight: 700; }
-  .pill { align-self: flex-start; font-size: 13px; padding: 5px 10px; border-radius: 999px; font-weight: 700; margin: 2px 0; }
+  .pill { align-self: flex-start; justify-self: start; font-size: 13px; padding: 5px 10px; border-radius: 999px; font-weight: 700; }
   .pill.neg { background: var(--neg-bg); color: var(--neg); }
+  .li.flag .pill.neg { background: var(--card); }
   .pill.ok { background: var(--pos-bg); color: var(--pos); }
   .pill.wait { background: var(--bg); color: var(--muted); font-weight: 500; }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
   .empty { margin: 0; padding: 18px 14px; color: var(--muted); background: var(--card); border: 1px dashed var(--line-strong); border-radius: 16px; text-align: center; }
   .danger { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
   .danger h3 { margin: 0; font-size: 16px; }
@@ -257,37 +285,15 @@
   <main id="countView" class="stack" tabindex="-1">
     <div class="saved" id="savedBox" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
-      <div><b id="savedTitle"></b><span id="savedTime" class="num"></span></div>
+      <div><b id="savedTitle"></b><span id="savedTime" class="num"></span><ul class="saved-list num" id="savedList"></ul></div>
     </div>
 
-    <section class="card entry-card">
-      <label class="c-name" for="qty"><span class="stepno" aria-hidden="true">1</span><span><span id="productName">Wagyu</span> count</span></label>
-      <p class="ko" id="qtyHint">매장 내 보유 갯수 입력 (개)</p>
-      <div class="stepper">
-        <button class="stepbtn" id="minus" type="button" aria-label="One less" aria-controls="qty">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg>
-        </button>
-        <input class="qty num" id="qty" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="next" aria-describedby="qtyHint countErr">
-        <button class="stepbtn plus" id="plus" type="button" aria-label="One more" aria-controls="qty">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-      </div>
-      <p class="field-err" id="countErr" hidden>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
-      </p>
-    </section>
+    <div class="err-summary" id="errSummary" tabindex="-1" role="alert" aria-labelledby="errTitle" hidden>
+      <h2 id="errTitle">확인해 주세요 · Please check</h2>
+      <ul id="errList"></ul>
+    </div>
 
-    <section class="card entry-card">
-      <label class="c-name" for="sysKg"><span class="stepno" aria-hidden="true">2</span><span>System stock</span></label>
-      <p class="ko" id="sysHint">시스템 상의 재고 입력 (kg)</p>
-      <div class="sys-wrap">
-        <input class="sys-in num" id="sysKg" type="text" inputmode="decimal" autocomplete="off" maxlength="9" placeholder="0.000" enterkeyhint="next" aria-describedby="sysHint sysErr">
-        <span class="sys-unit" aria-hidden="true">kg</span>
-      </div>
-      <p class="field-err" id="sysErr" hidden>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg><span></span>
-      </p>
-    </section>
+    <div class="stack" id="productCards"></div>
 
     <section class="card fields">
       <div class="field-wrap">
@@ -306,7 +312,7 @@
     </section>
 
     <button class="primary" id="save" type="button">Save</button>
-    <p class="hint">저장할 때 시간이 자동으로 기록돼요 · 지금 <span class="num" id="clock"></span></p>
+    <p class="hint">센 품목만 입력하면 돼요 · 저장할 때 시간이 자동으로 기록돼요 · 지금 <span class="num" id="clock"></span></p>
     <button class="linkbtn" id="toManager" type="button">Manager</button>
   </main>
 
@@ -331,11 +337,16 @@
     </section>
 
     <section id="mgrBody" class="stack" hidden>
-      <div class="totals" id="totals"></div>
+      <section class="card summary" aria-labelledby="sumTitle">
+        <h3 id="sumTitle">Latest by product</h3>
+        <div id="sumRows"></div>
+        <p class="muted num" id="sumMeta"></p>
+      </section>
+      <div class="chips" id="chips" role="group" aria-label="Show counts for"></div>
       <div class="stack" id="entries"></div>
       <section class="card danger" aria-labelledby="dangerTitle">
         <h3 id="dangerTitle">Reset all data</h3>
-        <p class="muted">Deletes every count in the Log sheet so you can start again. Settings and the PIN stay.</p>
+        <p class="muted">Deletes every count in the Log sheet so you can start again. Products, Settings and the PIN stay.</p>
         <button class="danger-outline" id="resetBtn" type="button">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Reset all data
         </button>
@@ -371,11 +382,20 @@
   'use strict';
   var CONFIG = <?!= configJson ?>;
   var TZ = 'Australia/Brisbane';
-  var PRODUCT = String(CONFIG.product || 'Wagyu');
-  var DRAFT_KEY = 'wagyu.draft.v3', NAME_KEY = 'stock.name', PIN_KEY = 'stock.pin';
+  var PRODUCTS = (CONFIG.products || []).filter(function (p) { return p && p.name; });
+  var DRAFT_KEY = 'stock.draft.v4', NAME_KEY = 'stock.name', PIN_KEY = 'stock.pin';
+  var LATER = 'Check later';
+  var ICON = {
+    minus: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg>',
+    plus: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>',
+    alert: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16.2v.01"/></svg>',
+    down: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>',
+    up: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 15-6-6-6 6"/></svg>'
+  };
 
   function $(id) { return document.getElementById(id); }
   function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function icon(markup) { var t = document.createElement('template'); t.innerHTML = markup; return t.content.firstChild; }
   function store(name) {
     return {
       get: function (k) { try { return window[name].getItem(k); } catch (e) { return null; } },
@@ -398,17 +418,26 @@
   // Round half away from zero (like the sheet's ROUND), nudged so 0.2865 doesn't become 0.286.
   function round(x, places) { var f = Math.pow(10, places); return (x < 0 ? -1 : 1) * Math.round(Math.abs(x) * f + 1e-7) / f; }
   function kg(n) { return n.toFixed(3) + ' kg'; }
-  function signedKg(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(3) + ' kg'; }
+  function pcs(n) { return n + (Math.abs(n) === 1 ? ' pc' : ' pcs'); }
+  function amount(n, unit) { return unit === 'pcs' ? pcs(n) : kg(n); }
+  function sign(n) { return n > 0 ? '+' : n < 0 ? '−' : ''; }
+  function signedAmount(n, unit) { return sign(n) + amount(Math.abs(n), unit); }
   function money(n) { return (n < 0 ? '−$' : n > 0 ? '+$' : '$') + Math.abs(n).toFixed(2); }
   function signed(n) { return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0'; }
   function counts(n) { return n + (n === 1 ? ' count' : ' counts'); }
-  function pcs(n) { return n + (n === 1 ? ' pc' : ' pcs'); }
+  function products(n) { return n + (n === 1 ? ' product' : ' products'); }
+  function tolText(t, unit) { return unit === 'pcs' ? pcs(t) : (Math.round(t * 100) === round(t * 100, 6) ? t.toFixed(2) : String(t)) + ' kg'; }
   /** "2.764", "2,764", ".5", "-0.2" → number; anything else → null. */
   function parseKg(text) {
     var t = String(text == null ? '' : text).trim().replace(',', '.');
     if (!/^-?(\d{1,4}(\.\d{0,3})?|\.\d{1,3})$/.test(t)) return null;
     var n = Number(t);
     return isFinite(n) ? round(n, 3) : null;
+  }
+  /** "12", "-3" → whole number; anything else → null. */
+  function parsePcs(text) {
+    var t = String(text == null ? '' : text).trim();
+    return /^-?\d{1,4}$/.test(t) ? parseInt(t, 10) : null;
   }
   function errText(e) {
     var m = e && e.message ? String(e.message) : String(e || '');
@@ -431,6 +460,11 @@
     var r = google.script.run.withSuccessHandler(ok).withFailureHandler(fail);
     r[fn].apply(r, args);
   }
+  function errBox(id) {
+    var p = mk('p', 'field-err'); p.id = id; p.hidden = true;
+    p.appendChild(icon(ICON.alert)); p.appendChild(mk('span'));
+    return p;
+  }
   function showErr(boxId, input, msg) {
     var box = $(boxId);
     box.lastElementChild.textContent = msg;
@@ -445,46 +479,160 @@
     if (input) input.removeAttribute('aria-invalid');
   }
   function focusQuiet(el) { try { el.focus({ preventScroll: true }); } catch (e) {} }
+  function reveal(el) {
+    var card = el.closest('.card') || el;
+    try { card.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) {}
+    focusQuiet(el);
+  }
 
-  /* ---------- count view: 1 count in store, 2 system stock (kg) ---------- */
-  // The comparison is not shown here on purpose: staff enter what they counted and what
-  // the system says; the sheet and the manager screen do the matching.
-  var qty = $('qty'), sysEl = $('sysKg'), nameEl = $('name'), noteEl = $('note'), saveBtn = $('save');
-  var count = null, busy = false;
+  /* ---------- count view: one card per product ---------- */
+  // Staff only enter what they counted and what the system shows. The match is not shown
+  // here on purpose; the sheet and the manager screen do the comparing.
+  var nameEl = $('name'), noteEl = $('note'), saveBtn = $('save');
+  var busy = false;
+  var state = PRODUCTS.map(function (p) { return { count: null, open: p.status !== LATER }; });
+  var ui = PRODUCTS.map(buildCard);
 
-  $('productName').textContent = PRODUCT;
+  function buildCard(p, i) {
+    var later = p.status === LATER;
+    var card = mk('section', 'card pcard' + (later ? ' later' : ''));
+    card.id = 'pc-' + i;
+    card.setAttribute('aria-labelledby', 'pt-' + i);
+
+    var head = mk('div', 'p-head');
+    var h = mk('h2', 'p-name'); h.id = 'pt-' + i;
+    h.appendChild(document.createTextNode(p.name));
+    if (p.ko) { h.appendChild(document.createTextNode(' ')); h.appendChild(mk('span', 'p-ko', p.ko)); }
+    head.appendChild(h);
+    if (later) head.appendChild(mk('span', 'tag warn', '확인 필요'));
+    card.appendChild(head);
+
+    var body = mk('div', 'p-body'); body.id = 'pb-' + i;
+    var toggle = null;
+    if (later) {
+      if (p.note) card.appendChild(mk('p', 'p-note', p.note));
+      toggle = mk('button', 'secondary disclose'); toggle.type = 'button';
+      toggle.setAttribute('aria-controls', body.id);
+      card.appendChild(toggle);
+    }
+
+    // 1 in store, always pieces
+    var f1 = mk('div', 'p-field');
+    var l1 = mk('label', 'p-lab'); l1.htmlFor = 'qty-' + i;
+    l1.appendChild(mk('span', 'stepno', '1')); l1.appendChild(document.createTextNode('In store'));
+    f1.appendChild(l1);
+    var h1 = mk('p', 'ko', '매장 내 보유 갯수 입력 (개)'); h1.id = 'qh-' + i; f1.appendChild(h1);
+    var stepper = mk('div', 'stepper');
+    var minus = mk('button', 'stepbtn'); minus.type = 'button'; minus.setAttribute('aria-label', 'One less ' + p.name); minus.appendChild(icon(ICON.minus));
+    var qty = mk('input', 'qty num'); qty.id = 'qty-' + i; qty.type = 'text'; qty.inputMode = 'numeric'; qty.pattern = '[0-9]*';
+    qty.maxLength = 4; qty.autocomplete = 'off'; qty.setAttribute('aria-describedby', 'qh-' + i + ' qe-' + i);
+    var plus = mk('button', 'stepbtn plus'); plus.type = 'button'; plus.setAttribute('aria-label', 'One more ' + p.name); plus.appendChild(icon(ICON.plus));
+    minus.setAttribute('aria-controls', qty.id); plus.setAttribute('aria-controls', qty.id);
+    stepper.appendChild(minus); stepper.appendChild(qty); stepper.appendChild(plus);
+    f1.appendChild(stepper);
+    var qe = errBox('qe-' + i); f1.appendChild(qe);
+    body.appendChild(f1);
+
+    // 2 system stock, in the product's system unit
+    var pc = p.unit === 'pcs';
+    var f2 = mk('div', 'p-field');
+    var l2 = mk('label', 'p-lab'); l2.htmlFor = 'sys-' + i;
+    l2.appendChild(mk('span', 'stepno', '2')); l2.appendChild(document.createTextNode('System stock'));
+    f2.appendChild(l2);
+    var h2 = mk('p', 'ko', '시스템 상의 재고 입력 (' + (pc ? '개' : 'kg') + ')'); h2.id = 'sh-' + i; f2.appendChild(h2);
+    var wrap = mk('div', 'sys-wrap');
+    var sys = mk('input', 'sys-in num'); sys.id = 'sys-' + i; sys.type = 'text'; sys.inputMode = pc ? 'numeric' : 'decimal';
+    sys.autocomplete = 'off'; sys.maxLength = pc ? 5 : 9; sys.placeholder = pc ? '0' : '0.000';
+    sys.setAttribute('aria-describedby', 'sh-' + i + ' se-' + i);
+    wrap.appendChild(sys);
+    var u = mk('span', 'sys-unit', pc ? 'pcs' : 'kg'); u.setAttribute('aria-hidden', 'true'); wrap.appendChild(u);
+    f2.appendChild(wrap);
+    var se = errBox('se-' + i); f2.appendChild(se);
+    body.appendChild(f2);
+    card.appendChild(body);
+    $('productCards').appendChild(card);
+
+    plus.addEventListener('click', function () { var c = state[i].count; if (!busy && c !== 9999) setCount(i, c == null ? 1 : c + 1); });
+    minus.addEventListener('click', function () { var c = state[i].count; if (!busy && c) setCount(i, c - 1); });
+    qty.addEventListener('input', function () {
+      var clean = qty.value.replace(/\D/g, '').slice(0, 4);
+      if (clean !== qty.value) qty.value = clean;
+      setCount(i, clean === '' ? null : parseInt(clean, 10));
+    });
+    qty.addEventListener('blur', sync);
+    sys.addEventListener('input', function () {
+      var v = sys.value.replace(/,/g, pc ? '' : '.').replace(pc ? /[^\d\-]/g : /[^\d.\-]/g, '').replace(/(?!^)-/g, '');
+      if (!pc) {
+        var dot = v.indexOf('.');
+        if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '').slice(0, 3);
+      }
+      if (v !== sys.value) sys.value = v;
+      clearErr(se.id, sys);
+      edited();
+    });
+    if (toggle) toggle.addEventListener('click', function () { setOpen(i, !state[i].open, true); });
+    return { card: card, qty: qty, sys: sys, minus: minus, plus: plus, qe: qe, se: se, body: body, toggle: toggle };
+  }
+
+  function setOpen(i, open, focusFirst) {
+    var u = ui[i];
+    state[i].open = open;
+    u.body.hidden = !open;
+    if (u.toggle) {
+      u.toggle.setAttribute('aria-expanded', String(open));
+      u.toggle.textContent = '';
+      u.toggle.appendChild(icon(open ? ICON.up : ICON.down));
+      u.toggle.appendChild(document.createTextNode(open ? '접기 · Hide' : '지금 입력하기 · Enter now'));
+    }
+    if (open && focusFirst) focusQuiet(u.qty);
+    saveDraft();
+  }
+
+  function filledCount() {
+    var n = 0;
+    PRODUCTS.forEach(function (p, i) { if (state[i].count != null || ui[i].sys.value.trim()) n++; });
+    return n;
+  }
 
   function sync() {
-    if (document.activeElement !== qty) qty.value = count == null ? '' : String(count);
-    // aria-disabled (not disabled) so a keyboard user's focus stays on the button at 0
-    $('minus').setAttribute('aria-disabled', String(busy || !count));
-    $('plus').setAttribute('aria-disabled', String(busy || count === 9999));
-    saveBtn.textContent = busy ? 'Saving…' : 'Save';
+    PRODUCTS.forEach(function (p, i) {
+      var u = ui[i], c = state[i].count;
+      if (document.activeElement !== u.qty) u.qty.value = c == null ? '' : String(c);
+      // aria-disabled (not disabled) so a keyboard user's focus stays on the button at 0
+      u.minus.setAttribute('aria-disabled', String(busy || !c));
+      u.plus.setAttribute('aria-disabled', String(busy || c === 9999));
+      u.qty.readOnly = u.sys.readOnly = busy;
+    });
+    var n = filledCount();
+    saveBtn.textContent = busy ? 'Saving…' : n ? 'Save ' + products(n) : 'Save';
     saveBtn.disabled = busy;
     saveBtn.setAttribute('aria-busy', String(busy));
-    qty.readOnly = sysEl.readOnly = nameEl.readOnly = noteEl.readOnly = busy;
+    nameEl.readOnly = noteEl.readOnly = busy;
   }
 
   function saveDraft() {
-    if (count == null && !sysEl.value && !noteEl.value) { local.del(DRAFT_KEY); return; }
-    local.set(DRAFT_KEY, JSON.stringify({ t: Date.now(), count: count, sys: sysEl.value, note: noteEl.value }));
+    var items = PRODUCTS.map(function (p, i) { return { count: state[i].count, sys: ui[i].sys.value, open: state[i].open }; });
+    var empty = !noteEl.value && items.every(function (x) { return x.count == null && !x.sys; });
+    if (empty) { local.del(DRAFT_KEY); return; }
+    local.set(DRAFT_KEY, JSON.stringify({ t: Date.now(), names: PRODUCTS.map(function (p) { return p.name; }), items: items, note: noteEl.value }));
   }
-  function edited() { $('savedBox').hidden = true; saveDraft(); }
-
-  function setCount(v) {
-    count = v == null || isNaN(v) ? null : Math.max(0, Math.min(9999, v));
-    clearErr('countErr', qty);
+  function edited() { $('savedBox').hidden = true; saveDraft(); sync(); }
+  function setCount(i, v) {
+    state[i].count = v == null || isNaN(v) ? null : Math.max(0, Math.min(9999, v));
+    clearErr(ui[i].qe.id, ui[i].qty);
     edited();
-    sync();
   }
 
-  $('plus').addEventListener('click', function () { if (!busy && count !== 9999) setCount(count == null ? 1 : count + 1); });
-  $('minus').addEventListener('click', function () { if (!busy && count) setCount(count - 1); });
+  /** Enter moves to the next empty box: count → system → next product … → name. */
+  function inputsInOrder() {
+    var list = [];
+    PRODUCTS.forEach(function (p, i) { if (state[i].open) list.push(ui[i].qty, ui[i].sys); });
+    list.push(nameEl);
+    return list;
+  }
   function nextEmpty(after) {
-    var order = [qty, sysEl, nameEl];
-    for (var i = order.indexOf(after) + 1; i < order.length; i++) {
-      if (!order[i].value.trim()) return order[i];
-    }
+    var list = inputsInOrder();
+    for (var i = list.indexOf(after) + 1; i < list.length; i++) if (!list[i].value.trim()) return list[i];
     return null;
   }
   function enterMoves(el) {
@@ -496,52 +644,67 @@
       if (n) n.focus(); else el.blur();
     });
   }
-  qty.addEventListener('input', function () {
-    var clean = qty.value.replace(/\D/g, '').slice(0, 4);
-    if (clean !== qty.value) qty.value = clean;
-    setCount(clean === '' ? null : parseInt(clean, 10));
-  });
-  qty.addEventListener('blur', sync);
-  sysEl.addEventListener('input', function () {
-    var v = sysEl.value.replace(/,/g, '.').replace(/[^\d.\-]/g, '').replace(/(?!^)-/g, '');
-    var dot = v.indexOf('.');
-    if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '').slice(0, 3);
-    if (v !== sysEl.value) sysEl.value = v;
-    clearErr('sysErr', sysEl);
-    edited();
-  });
-  enterMoves(qty); enterMoves(sysEl); enterMoves(nameEl);
+  ui.forEach(function (u) { enterMoves(u.qty); enterMoves(u.sys); });
+  enterMoves(nameEl);
   nameEl.addEventListener('input', function () { clearErr('nameErr', nameEl); });
   noteEl.addEventListener('input', edited);
   noteEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); noteEl.blur(); } });
 
+  /* ---------- errors: inline under each box, plus a list at the top when there is more than one ---------- */
+  function hideSummary() { $('errSummary').hidden = true; $('errList').textContent = ''; }
+  function showSummary(errors) {
+    var list = $('errList'); list.textContent = '';
+    errors.forEach(function (er) {
+      var li = mk('li'), a = mk('a', null, er.text);
+      a.href = '#' + er.input.id;
+      a.addEventListener('click', function (e) { e.preventDefault(); reveal(er.input); });
+      li.appendChild(a); list.appendChild(li);
+    });
+    var box = $('errSummary');
+    box.hidden = false;
+    // jump straight there: the list has to be readable the moment focus lands on it
+    try { box.scrollIntoView({ block: 'start' }); } catch (e) {}
+    focusQuiet(box);
+  }
+
   function save() {
     if (busy) return;
-    var name = nameEl.value.trim(), sys = parseKg(sysEl.value), first = null;
-    if (count == null) { showErr('countErr', qty, '보유 갯수를 입력하세요 · Enter how many ' + PRODUCT + ' you counted.'); first = qty; }
-    if (!sysEl.value.trim()) { showErr('sysErr', sysEl, '시스템 재고(kg)를 입력하세요 · Enter the system stock in kg.'); first = first || sysEl; }
-    else if (sys === null) { showErr('sysErr', sysEl, '숫자로 입력하세요 (예: 2.764) · Use a number like 2.764.'); first = first || sysEl; }
-    if (!name) { showErr('nameErr', nameEl, '이름을 입력하세요 · Enter your name.'); first = first || nameEl; }
-    if (first) {
-      // show the whole card (its title and hint), not just the box, below the green bar
-      var card = first.closest('.card');
-      try { (card || first).scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) {}
-      focusQuiet(first);
-      return;
+    hideSummary();
+    var errors = [], items = [], name = nameEl.value.trim();
+    function fail(boxId, input, p, msg) {
+      if (boxId) showErr(boxId, input, msg);
+      errors.push({ input: input, text: (p ? p.name + ' · ' : '') + msg });
     }
+    PRODUCTS.forEach(function (p, i) {
+      var u = ui[i], c = state[i].count, raw = u.sys.value.trim();
+      clearErr(u.qe.id, u.qty); clearErr(u.se.id, u.sys);
+      if (c == null && !raw) return;            // not counted this time
+      if (!state[i].open) setOpen(i, true, false);
+      var sysVal = raw ? (p.unit === 'pcs' ? parsePcs(raw) : parseKg(raw)) : null;
+      if (c == null) fail(u.qe.id, u.qty, p, '① 보유 갯수를 입력하세요 · Enter the count');
+      if (!raw) fail(u.se.id, u.sys, p, '② 시스템 재고를 입력하세요 · Enter the system stock');
+      else if (sysVal === null) fail(u.se.id, u.sys, p, p.unit === 'pcs' ? '② 개수로 입력하세요 (예: 12) · Use whole pieces' : '② 숫자로 입력하세요 (예: 2.764) · Use a number like 2.764');
+      if (c != null && sysVal !== null) items.push({ product: p.name, count: c, system: sysVal, unit: p.unit });
+    });
+    if (!errors.length && !items.length && ui.length) fail(null, ui[0].qty, null, '센 품목을 하나 이상 입력하세요 · Enter at least one product');
+    if (!name) fail('nameErr', nameEl, null, '이름을 입력하세요 · Enter your name');
+    if (errors.length > 1 || (errors.length === 1 && !errors[0].input.getAttribute('aria-invalid'))) { showSummary(errors); return; }
+    if (errors.length) { reveal(errors[0].input); return; }
+
     local.set(NAME_KEY, name);
-    var sent = count;
     busy = true; sync();
-    call('submitCount', [{ by: name, count: sent, systemKg: sys, note: noteEl.value }], function (res) {
-      var n = res && res.count != null ? res.count : sent;
-      var k = res && res.systemKg != null ? res.systemKg : sys;
+    call('submitCount', [{ by: name, note: noteEl.value, items: items.map(function (x) { return { product: x.product, count: x.count, system: x.system }; }) }], function (res) {
       busy = false;
-      count = null; sysEl.value = ''; noteEl.value = ''; local.del(DRAFT_KEY);
+      PRODUCTS.forEach(function (p, i) { state[i].count = null; ui[i].sys.value = ''; if (p.status === LATER) setOpen(i, false, false); });
+      noteEl.value = ''; local.del(DRAFT_KEY);
       sync();
-      $('savedTitle').textContent = 'Saved: ' + pcs(n) + ' · system ' + kg(k);
+      var saved = (res && res.items) || items;
+      $('savedTitle').textContent = 'Saved ' + products(saved.length);
       $('savedTime').textContent = res && res.at ? res.at : '';
+      var list = $('savedList'); list.textContent = '';
+      saved.forEach(function (x) { list.appendChild(mk('li', null, x.product + ': ' + pcs(x.count) + ' · system ' + amount(x.system, x.unit))); });
       $('savedBox').hidden = false;
-      say('live', 'Saved ' + pcs(n) + ' of ' + PRODUCT + ' and system stock ' + kg(k) + (res && res.at ? ' at ' + res.at : ''));
+      say('live', 'Saved ' + products(saved.length) + (res && res.at ? ' at ' + res.at : ''));
       try { window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
       if (navigator.vibrate) { try { navigator.vibrate(25); } catch (e) {} }
     }, function (err) {
@@ -558,15 +721,21 @@
     try {
       var d = JSON.parse(raw);
       if (!d || !(Date.now() - d.t < 45 * 60 * 1000)) { local.del(DRAFT_KEY); return; }
-      if (typeof d.count === 'number' && d.count >= 0 && d.count <= 9999) count = Math.floor(d.count);
-      if (d.sys) sysEl.value = String(d.sys).slice(0, 9);
+      (d.items || []).forEach(function (x, j) {
+        var i = PRODUCTS.map(function (p) { return p.name; }).indexOf(d.names && d.names[j]);
+        if (i < 0 || !x) return;
+        if (typeof x.count === 'number' && x.count >= 0 && x.count <= 9999) state[i].count = Math.floor(x.count);
+        if (x.sys) ui[i].sys.value = String(x.sys).slice(0, 9);
+        if (x.open || state[i].count != null || x.sys) state[i].open = true;
+      });
       if (d.note) noteEl.value = String(d.note).slice(0, 200);
     } catch (e) { local.del(DRAFT_KEY); }
   })();
+  PRODUCTS.forEach(function (p, i) { setOpen(i, state[i].open, false); });
   sync();
 
   /* ---------- manager view ---------- */
-  var mgr = { pin: null, rows: [], total: 0, tolKg: 0.1, loadedAt: '' };
+  var mgr = { pin: null, rows: [], total: 0, products: [], filter: '', loadedAt: '' };
   var dayFmt = null, ymdFmt = null;
   try { dayFmt = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) {}
   try { ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }); } catch (e) {}
@@ -588,7 +757,7 @@
     return niceDay(d);
   }
   function shortAt(s, day) { return s.slice(0, 10) === day ? s.slice(11) : niceDay(s.slice(0, 10)) + ' ' + s.slice(11); }
-  function tolText() { var t = mgr.tolKg; return (Math.round(t * 100) === round(t * 100, 6) ? t.toFixed(2) : String(t)) + ' kg'; }
+  function whenText(s) { return dayLabel(s.slice(0, 10)).split(' · ')[0] + ' ' + s.slice(11, 16); }
 
   function setLoading(on) {
     $('unlock').disabled = on; $('refresh').disabled = on;
@@ -648,15 +817,15 @@
     var refreshing = !!mgr.pin;
     clearErr('pinErr', $('pin'));
     setLoading(true);
-    call('getRecent', [pin, 200], function (res) {
+    call('getRecent', [pin, 300], function (res) {
       setLoading(false);
       mgr.pin = pin; sess.set(PIN_KEY, pin); $('pin').value = '';
       mgr.rows = (res && res.rows) || [];
       mgr.total = res && res.total != null ? res.total : mgr.rows.length;
-      if (res && res.tolKg > 0) mgr.tolKg = res.tolKg;
+      mgr.products = (res && res.products) || PRODUCTS;
       mgr.loadedAt = nowText();
       $('pinCard').hidden = true; $('mgrBody').hidden = false; $('refresh').hidden = false;
-      renderEntries();
+      renderManager();
       if (refreshing) say('live', 'Updated');
     }, function (err) {
       setLoading(false);
@@ -669,90 +838,152 @@
     });
   }
 
-  /** Counted kg (count × average weight) against the system kg, the same way the Log does it. */
+  /** Count turned into the system unit and compared, the same way the Log does it. */
   function diffInfo(r) {
-    if (r.count == null || r.avgKg == null || r.systemKg == null) return null;
-    var counted = round(r.count * r.avgKg, 3), d = round(counted - r.systemKg, 3);
+    if (r.count == null || r.system == null) return null;
+    var counted;
+    if (r.unit === 'pcs') counted = r.count;
+    else if (r.count === 0) counted = 0;
+    else if (r.avgKg > 0) counted = round(r.count * r.avgKg, 3);
+    else return { noAvg: true };
+    var d = round(counted - r.system, 3);
     return {
-      countedKg: counted,
-      kg: d,
-      pieces: r.avgKg > 0 ? round(Math.abs(d) / r.avgKg, 1) : null,
+      counted: counted,
+      d: d,
+      pieces: r.unit === 'pcs' ? Math.abs(d) : (r.avgKg > 0 ? round(Math.abs(d) / r.avgKg, 1) : null),
       cost: r.price != null ? round(d * r.price, 2) : null,
-      flagged: Math.abs(d) >= mgr.tolKg - 1e-9
+      flagged: r.tol > 0 && Math.abs(d) >= r.tol - 1e-9
     };
   }
-
-  function gapText(i) {
-    return (i.kg < 0 ? 'Short' : 'Over') + (i.pieces != null ? ' ≈ ' + i.pieces.toFixed(1) + (i.pieces <= 1 ? ' pc' : ' pcs') : '');
+  function gapText(i, unit) {
+    var side = i.d < 0 ? 'Short' : 'Over';
+    if (unit === 'pcs') return side + ' ' + pcs(i.pieces);
+    return side + (i.pieces != null ? ' ≈ ' + i.pieces.toFixed(1) + (i.pieces <= 1 ? ' pc' : ' pcs') : '');
   }
-
   function pill(r) {
     var i = diffInfo(r), s = mk('span', 'pill');
     if (!i) { s.className += ' wait'; s.textContent = 'No system figure'; return s; }
-    if (!i.flagged) { s.className += ' ok'; s.textContent = 'OK · ' + signedKg(i.kg); return s; }
+    if (i.noAvg) { s.className += ' warn'; s.textContent = 'Set the average weight in Products to compare'; return s; }
+    if (!i.flagged) { s.className += ' ok'; s.textContent = 'OK · ' + (i.d === 0 ? 'matches' : signedAmount(i.d, r.unit)); return s; }
     s.className += ' neg';
-    s.textContent = gapText(i) + ' · ' + signedKg(i.kg) + (i.cost != null ? ' · ' + money(i.cost) : '');
+    s.textContent = gapText(i, r.unit) + (r.unit === 'pcs' ? '' : ' · ' + signedAmount(i.d, r.unit)) + (i.cost != null ? ' · ' + money(i.cost) : '');
     return s;
   }
 
-  function renderTotals() {
-    var rows = mgr.rows, flagged = 0;
-    rows.forEach(function (r) { var i = diffInfo(r); if (i && i.flagged) flagged++; });
-    var t = $('totals'); t.textContent = '';
-    function tile(label, value, sub, bad) {
-      var b = mk('div', 'tot' + (bad ? ' bad' : ''));
-      b.appendChild(mk('div', 'k', label)); b.appendChild(mk('div', 'v num', value)); b.appendChild(mk('div', 's num', sub));
-      t.appendChild(b);
+  /** Every product on the list, plus any product that only appears in old rows. */
+  function productList() {
+    var list = [], seen = {};
+    mgr.products.forEach(function (p) { if (p.status !== 'Off' || mgr.rows.some(function (r) { return r.product === p.name; })) { list.push(p); seen[p.name] = 1; } });
+    mgr.rows.forEach(function (r) { if (!seen[r.product]) { seen[r.product] = 1; list.push({ name: r.product, ko: '', unit: r.unit, status: 'Active' }); } });
+    return list;
+  }
+
+  function renderManager() {
+    var list = productList();
+    if (mgr.filter && !list.some(function (p) { return p.name === mgr.filter; })) mgr.filter = '';
+    renderSummary(list);
+    renderChips(list);
+    renderEntries();
+  }
+
+  function renderSummary(list) {
+    var box = $('sumRows'); box.textContent = '';
+    var flagged = 0;
+    mgr.rows.forEach(function (r) { var i = diffInfo(r); if (i && i.flagged) flagged++; });
+    list.forEach(function (p) {
+      var latest = null;
+      for (var k = 0; k < mgr.rows.length; k++) if (mgr.rows[k].product === p.name) { latest = mgr.rows[k]; break; }
+      var row = mk('div', 'sum-row');
+      var nm = mk('div', 'sum-name', p.name);
+      if (p.ko) { nm.appendChild(document.createTextNode(' ')); nm.appendChild(mk('span', 'p-ko', p.ko)); }
+      row.appendChild(nm);
+      row.appendChild(mk('div', 'sum-when num', latest ? whenText(latest.at) : ''));
+      if (latest) row.appendChild(pill(latest));
+      else {
+        var s = mk('span', 'pill ' + (p.status === LATER ? 'warn' : 'wait'), p.status === LATER ? ('확인 필요' + (p.note ? ' · ' + p.note : '')) : 'No counts yet');
+        row.appendChild(s);
+      }
+      box.appendChild(row);
+    });
+    $('sumMeta').textContent = counts(mgr.rows.length) + ' · ' + flagged + ' red · updated ' + mgr.loadedAt;
+  }
+
+  function renderChips(list) {
+    var box = $('chips'); box.textContent = '';
+    function chip(value, label, n) {
+      var b = mk('button', 'chip'); b.type = 'button';
+      b.setAttribute('aria-pressed', String(mgr.filter === value));
+      b.appendChild(document.createTextNode(label));
+      b.appendChild(mk('span', 'n', String(n)));
+      b.addEventListener('click', function () { mgr.filter = value; renderChips(list); renderEntries(); });
+      box.appendChild(b);
     }
-    var latest = rows[0], li = latest ? diffInfo(latest) : null;
-    tile('Latest difference', li ? signedKg(li.kg) : '—',
-      li ? (li.flagged ? gapText(li) : 'Within ±' + tolText()) : (latest ? 'No system figure' : 'No counts yet'),
-      !!(li && li.flagged));
-    tile('Red flags', String(flagged), 'of ' + counts(rows.length), flagged > 0);
-    t.appendChild(mk('p', 'muted num', 'Red when counted kg and system kg are ' + tolText() + ' or more apart' + (mgr.loadedAt ? ' · updated ' + mgr.loadedAt : '')));
+    chip('', 'All', mgr.rows.length);
+    list.forEach(function (p) { chip(p.name, p.name, mgr.rows.filter(function (r) { return r.product === p.name; }).length); });
+  }
+
+  /** Rows saved together (one tap of Save) share an id before the dot and show as one card. */
+  function groups() {
+    var out = [], byKey = {};
+    mgr.rows.forEach(function (r) {
+      if (mgr.filter && r.product !== mgr.filter) return;
+      var key = String(r.id).split('.')[0];
+      var g = byKey[key];
+      if (!g) { g = byKey[key] = { at: r.at, by: r.by, note: r.note, rows: [] }; out.push(g); }
+      g.rows.push(r);
+    });
+    var order = {};
+    productList().forEach(function (p, i) { order[p.name] = i; });
+    out.forEach(function (g) { g.rows.sort(function (a, b) { return (order[a.product] || 0) - (order[b.product] || 0); }); });
+    return out;
   }
 
   function renderEntries() {
-    renderTotals();
     var box = $('entries'); box.textContent = '';
-    if (!mgr.rows.length) { box.appendChild(mk('p', 'empty', 'No counts yet. They show up here as soon as someone taps Save.')); return; }
+    var list = groups();
+    if (!list.length) { box.appendChild(mk('p', 'empty', mgr.filter ? 'No counts for ' + mgr.filter + ' yet.' : 'No counts yet. They show up here as soon as someone taps Save.')); return; }
     var lastDay = null;
-    mgr.rows.forEach(function (r) {
-      var d = r.at.slice(0, 10);
+    list.forEach(function (g) {
+      var d = g.at.slice(0, 10);
       if (d !== lastDay) { box.appendChild(mk('h3', 'day', dayLabel(d))); lastDay = d; }
-      box.appendChild(entryCard(r));
+      box.appendChild(groupCard(g));
     });
   }
 
-  function entryCard(r) {
-    var day = r.at.slice(0, 10), info = diffInfo(r);
-    var c = mk('article', 'entry' + (info && info.flagged ? ' flag' : ''));
+  function groupCard(g) {
+    var day = g.at.slice(0, 10), any = false;
+    var c = mk('article', 'entry');
     var top = mk('div', 'e-top');
-    top.appendChild(mk('span', 'e-time num', r.at.slice(11) || r.at));
-    top.appendChild(mk('span', 'e-by', r.by || '?'));
+    top.appendChild(mk('span', 'e-time num', g.at.slice(11) || g.at));
+    top.appendChild(mk('span', 'e-by', g.by || '?'));
     c.appendChild(top);
-
-    var figs = mk('dl', 'figs num');
-    function fig(label, value, extra) {
-      figs.appendChild(mk('dt', null, label));
-      var dd = mk('dd', null, value);
-      if (extra) dd.appendChild(mk('span', 'muted', ' ' + extra));
-      figs.appendChild(dd);
-    }
-    fig('Counted', r.count != null ? pcs(r.count) : '—', info ? '≈ ' + kg(info.countedKg) : (r.count != null && r.avgKg ? '≈ ' + kg(round(r.count * r.avgKg, 3)) : ''));
-    fig('System', r.systemKg != null ? kg(r.systemKg) : '—');
-    c.appendChild(figs);
-    c.appendChild(pill(r));
-
-    if (r.prevCount != null && r.prevAt && r.count != null) {
-      var ch = r.count - r.prevCount, l2 = mk('p', 'e-line');
-      l2.appendChild(document.createTextNode('Since last count '));
-      l2.appendChild(mk('span', ch < 0 ? 'chg-neg num' : ch > 0 ? 'chg-pos num' : 'num', signed(ch)));
-      l2.appendChild(mk('span', 'muted num', ' (was ' + r.prevCount + ')'));
-      c.appendChild(l2);
-      c.appendChild(mk('p', 'e-cctv num', 'CCTV window ' + shortAt(r.prevAt, day) + ' → ' + r.at.slice(11)));
-    }
-    if (r.note) c.appendChild(mk('p', 'e-note', r.note));
+    g.rows.forEach(function (r) {
+      var info = diffInfo(r), flag = !!(info && info.flagged);
+      if (flag) any = true;
+      var li = mk('div', 'li' + (flag ? ' flag' : ''));
+      li.appendChild(mk('div', 'li-name', r.product));
+      var figs = mk('dl', 'figs num');
+      function fig(label, value, extra) {
+        figs.appendChild(mk('dt', null, label));
+        var dd = mk('dd', null, value);
+        if (extra) dd.appendChild(mk('span', 'muted', ' ' + extra));
+        figs.appendChild(dd);
+      }
+      fig('Counted', r.count != null ? pcs(r.count) : '—', r.unit !== 'pcs' && info && !info.noAvg && r.count ? '≈ ' + kg(info.counted) : '');
+      fig('System', r.system != null ? amount(r.system, r.unit) : '—');
+      li.appendChild(figs);
+      li.appendChild(pill(r));
+      if (r.prevCount != null && r.prevAt && r.count != null) {
+        var ch = r.count - r.prevCount, l2 = mk('p', 'e-cctv num');
+        l2.appendChild(document.createTextNode('Since last count '));
+        l2.appendChild(mk('span', ch < 0 ? 'chg-neg' : ch > 0 ? 'chg-pos' : '', signed(ch)));
+        l2.appendChild(document.createTextNode(' (was ' + r.prevCount + ') · CCTV ' + shortAt(r.prevAt, day) + ' → ' + r.at.slice(11)));
+        li.appendChild(l2);
+      }
+      c.appendChild(li);
+    });
+    if (any) c.className += ' flag';
+    if (g.note) c.appendChild(mk('p', 'e-note', g.note));
     return c;
   }
 
@@ -766,7 +997,7 @@
   function openReset() {
     lastFocus = document.activeElement;
     var n = mgr.total;
-    $('rdBody').textContent = (n ? 'All ' + counts(n) : 'Every count') + ' in the Log sheet will be deleted for good. Settings and the PIN stay.';
+    $('rdBody').textContent = (n ? 'All ' + counts(n) : 'Every count') + ' in the Log sheet will be deleted for good. Products, Settings and the PIN stay.';
     clearErr('rdErr');
     dlg.hidden = false;
     document.body.classList.add('modal-open');
@@ -797,7 +1028,7 @@
       var n = res && res.cleared != null ? res.cleared : mgr.total;
       mgr.rows = []; mgr.total = 0; mgr.loadedAt = nowText();
       closeReset();
-      renderEntries();
+      renderManager();
       toast('All data reset · ' + counts(n) + ' deleted');
     }, function (err) {
       setResetting(false);
