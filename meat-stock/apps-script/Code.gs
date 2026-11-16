@@ -39,7 +39,9 @@ const P = { name: 0, ko: 1, unit: 2, avg: 3, tol: 4, price: 5, status: 6, note: 
 const DEFAULT_PRODUCTS = [
   [WAGYU, '와규', 'kg', WAGYU_AVG_KG, 0.1, '', 'Active', ''],
   ['Pork belly', '냉장 삼겹살', 'pcs', '', 1, '', 'Active', ''],
-  ['Wagyu soup cuts', '와규 국거리', 'kg', '', 0.1, '', 'Check later', '현재 매장 재고 없음 · 나중에 확인']
+  ['Wagyu soup cuts', '와규 국거리', 'kg', '', 0.1, '', 'Check later', '현재 매장 재고 없음 · 나중에 확인'],
+  ['Marinated beef bulgogi', '양념 소 불고기', 'pcs', '', 1, '', 'Active', ''],
+  ['Marinated wagyu beef bulgogi', '양념 와규 소 불고기', 'pcs', '', 1, '', 'Active', '']
 ];
 
 /** Settings rows: [name, default value, number format, what it does]. */

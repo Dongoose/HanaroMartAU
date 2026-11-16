@@ -9,6 +9,8 @@
 | 와규 (Wagyu) | 갯수 | kg (갯수 × 0.1455 kg으로 비교) | ±0.10 kg 이상 |
 | 냉장 삼겹살 (Pork belly) | 갯수 | 갯수 | 1개 이상 |
 | 와규 국거리 (Wagyu soup cuts) | 현재 매장 재고 없음 · 나중에 확인 (Check later) | kg | ±0.10 kg 이상 |
+| 양념 소 불고기 (Marinated beef bulgogi) | 갯수 | 갯수 | 1개 이상 |
+| 양념 와규 소 불고기 (Marinated wagyu beef bulgogi) | 갯수 | 갯수 | 1개 이상 |
 
 | 파일 | 붙여넣을 곳 |
 | --- | --- |
